@@ -20,6 +20,12 @@ plugins {
 group = 're.mkw'
 version = '1.0.0'
 
+// Compile for Java 17 (Ghidra 11.x requirement)
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
 //----------------------START "DO NOT MODIFY" SECTION------------------------------
 def ghidraInstallDir = null
 
@@ -53,13 +59,11 @@ dependencies {
     // JDBC
     runtimeOnly 'org.xerial:sqlite-jdbc:3.42.0.0'
 
-    // gRPC
+    // gRPC - use shaded version to avoid Netty conflicts with Ghidra
     implementation "io.grpc:grpc-protobuf:${grpcVersion}"
     implementation "io.grpc:grpc-services:${grpcVersion}"
     implementation "io.grpc:grpc-stub:${grpcVersion}"
-    implementation "io.grpc:grpc-netty:${grpcVersion}"
-    implementation 'io.netty:netty-transport-native-epoll:4.1.86.Final'
-    runtimeOnly "io.grpc:grpc-netty-shaded:${grpcVersion}"
+    implementation "io.grpc:grpc-netty-shaded:${grpcVersion}"
     compileOnly 'org.apache.tomcat:annotations-api:6.0.53'
 }
 

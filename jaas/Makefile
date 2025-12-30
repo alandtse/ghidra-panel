@@ -1,9 +1,13 @@
-GRADLE?=gradle
+GRADLE?=./gradlew
 SQLITE?=sqlite3
 
 .PHONY: build
 build:
+ifeq ($(OS),Windows_NT)
+	.\gradlew.bat jar
+else
 	$(GRADLE) jar
+endif
 
 ../test.db:
 	$(MAKE) -C .. test.db
