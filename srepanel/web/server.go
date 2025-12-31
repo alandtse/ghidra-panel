@@ -7,14 +7,18 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/oschwald/geoip2-golang"
 	"go.mkw.re/ghidra-panel/common"
 	"go.mkw.re/ghidra-panel/database"
 	"go.mkw.re/ghidra-panel/discord"
 	"go.mkw.re/ghidra-panel/ghidra"
+	"go.mkw.re/ghidra-panel/oauth"
 	"go.mkw.re/ghidra-panel/token"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 var (
@@ -26,17 +30,24 @@ var (
 )
 
 var (
-	homePage  *template.Template
-	loginPage *template.Template
-	repoPage  *template.Template
-	errorPage *template.Template
+	homePage        *template.Template
+	loginPage       *template.Template
+	repoPage        *template.Template
+	credentialsPage *template.Template
+	adminPage       *template.Template
+	errorPage       *template.Template
 )
 
 func init() {
 	templates, err := template.New("").
 		Funcs(template.FuncMap{
-			"permColor":   ghidra.PermColorHex,
-			"permDisplay": ghidra.PermDisplay,
+			"permColor":      ghidra.PermColorHex,
+			"permDisplay":    ghidra.PermDisplay,
+			"formatSize":     formatSize,
+			"formatDate":     formatDate,
+			"formatUptime":   formatUptime,
+			"actionDesc":     database.GetActionDescription,
+			"formatLocation": formatLocation,
 		}).
 		ParseFS(templates, "templates/*.gohtml")
 	if err != nil {
@@ -45,10 +56,13 @@ func init() {
 	homePage = templates.Lookup("home.gohtml")
 	loginPage = templates.Lookup("login.gohtml")
 	repoPage = templates.Lookup("repo.gohtml")
+	credentialsPage = templates.Lookup("credentials.gohtml")
+	adminPage = templates.Lookup("admin.gohtml")
 	errorPage = templates.Lookup("error.gohtml")
 }
 
 type Config struct {
+	CommunityName     string
 	BaseURL           string
 	GhidraEndpoint    *common.GhidraEndpoint
 	Links             []common.Link
@@ -56,14 +70,21 @@ type Config struct {
 	DiscordWebhookURL string
 	Dev               bool // developer mode
 	SuperAdmins       []uint64
+	FirstUserIsAdmin  bool
+	GeoIPDatabase     string // path to GeoLite2-City.mmdb (optional)
 }
 
 type Server struct {
-	Config *Config
-	DB     *database.DB
-	Auth   *discord.Auth
-	Issuer *token.Issuer
-	Client ghidra.GhidraClient
+	Config           *Config
+	DB               *database.DB
+	Auth             *discord.Auth // deprecated, kept for backwards compatibility
+	Providers        map[string]oauth.Provider
+	ProviderMetadata map[string]*common.ProviderMetadata
+	Issuer           *token.Issuer
+	Client           ghidra.GhidraClient
+	useSecureCookie  bool      // whether to set Secure flag on cookies
+	StartTime        time.Time // Panel start time for uptime tracking
+	GeoIPDB          *geoip2.Reader // GeoIP database for location lookups (optional)
 }
 
 func NewServer(
@@ -73,14 +94,36 @@ func NewServer(
 	issuer *token.Issuer,
 	client ghidra.GhidraClient,
 ) (*Server, error) {
+	// Determine if we should use secure cookies based on base URL
+	useSecure := true
+	if baseURL, err := url.Parse(config.BaseURL); err == nil {
+		// Only use secure cookies if the base URL is HTTPS
+		useSecure = baseURL.Scheme == "https"
+	}
+
 	server := &Server{
-		Config: config,
-		DB:     db,
-		Auth:   auth,
-		Issuer: issuer,
-		Client: client,
+		Config:           config,
+		DB:               db,
+		Auth:             auth,
+		Providers:        make(map[string]oauth.Provider),
+		ProviderMetadata: make(map[string]*common.ProviderMetadata),
+		Issuer:           issuer,
+		Client:           client,
+		useSecureCookie:  useSecure,
+		StartTime:        time.Now(),
 	}
 	return server, nil
+}
+
+// AddProvider registers an OAuth provider
+func (s *Server) AddProvider(provider oauth.Provider) {
+	s.Providers[provider.Name()] = provider
+}
+
+// AddProviderWithMetadata registers an OAuth provider with display metadata
+func (s *Server) AddProviderWithMetadata(provider oauth.Provider, metadata *common.ProviderMetadata) {
+	s.Providers[provider.Name()] = provider
+	s.ProviderMetadata[provider.Name()] = metadata
 }
 
 func (s *Server) RegisterRoutes(mux *http.ServeMux) {
@@ -88,15 +131,18 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /login", s.handleLogin)
 	mux.HandleFunc("POST /login", s.handleLogin)
 	mux.HandleFunc("GET /redirect", s.handleOAuthRedirect)
+	mux.HandleFunc("GET /oauth/{provider}", s.handleOAuthProvider)
 	mux.HandleFunc("GET /logout", s.handleLogout)
 	mux.HandleFunc("GET /repos/{repo}", s.handleRepo)
 
+	mux.HandleFunc("GET /credentials", s.handleCredentials)
 	mux.HandleFunc("POST /create_account", s.handleCreateAccount)
 	mux.HandleFunc("POST /update_account", s.handleUpdateAccount)
 	mux.HandleFunc("POST /request_access", s.handleRequestAccess)
 	mux.HandleFunc("POST /set_user_access", s.handleSetUserAccess)
 	mux.HandleFunc("POST /update_repo", s.handleUpdateRepo)
 	mux.HandleFunc("POST /delete_repo", s.handleDeleteRepo)
+	mux.HandleFunc("GET /admin", s.handleAdmin)
 
 	// Create file server for assets
 	mux.Handle("GET /assets/", http.FileServer(http.FS(assets)))
@@ -104,12 +150,16 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 
 // State holds server-side web page state.
 type State struct {
-	Identity  *common.Identity // current user, null if unauthenticated
-	UserState *common.UserState
-	Nav       []Nav         // navigation bar
-	Links     []common.Link // footer links
-	Ghidra    *common.GhidraEndpoint
-	Status    string
+	Identity      *common.Identity // current user, null if unauthenticated
+	UserState     *common.UserState
+	Nav           []Nav         // navigation bar
+	Links         []common.Link // footer links
+	Ghidra        *common.GhidraEndpoint
+	Status        string
+	GhidraOnline  bool   // whether Ghidra server is reachable
+	GhidraVersion string // Ghidra server version (if online)
+	CommunityName string // Community/server name for display
+	SuperAdmin    bool   // whether current user is a super admin
 }
 
 type Nav struct {
@@ -118,11 +168,40 @@ type Nav struct {
 }
 
 func (s *Server) stateWithNav(req *http.Request, nav ...Nav) *State {
+	// Check Ghidra server status
+	ghidraOnline := false
+	ghidraVersion := ""
+	
+	if s.Config.Dev {
+		log.Printf("Checking Ghidra server at %s:%d", s.Config.GhidraEndpoint.Hostname, s.Config.GhidraEndpoint.Port)
+	}
+	
+	reply, err := s.Client.GetRepositories(req.Context(), &emptypb.Empty{})
+	if err != nil {
+		if s.Config.Dev {
+			log.Printf("Ghidra server connection failed: %v", err)
+		}
+	} else if reply != nil && reply.Version != nil {
+		ghidraOnline = true
+		ghidraVersion = reply.Version.GhidraVersion
+		if s.Config.Dev {
+			log.Printf("Ghidra server online: version %s", ghidraVersion)
+		}
+	}
+	
+	communityName := s.Config.CommunityName
+	if communityName == "" {
+		communityName = "Ghidra Panel"
+	}
+
 	return &State{
-		Ghidra: s.Config.GhidraEndpoint,
-		Nav:    nav,
-		Links:  s.Config.Links,
-		Status: req.URL.Query().Get("status"),
+		Ghidra:        s.Config.GhidraEndpoint,
+		Nav:           nav,
+		Links:         s.Config.Links,
+		Status:        req.URL.Query().Get("status"),
+		GhidraOnline:  ghidraOnline,
+		GhidraVersion: ghidraVersion,
+		CommunityName: communityName,
 	}
 }
 
@@ -139,6 +218,19 @@ func (s *Server) authenticateState(wr http.ResponseWriter, req *http.Request, st
 		return false
 	}
 
+	// Populate provider from database (don't trust JWT token for provider info)
+	if ident.Provider == "" {
+		provider, username, err := s.DB.GetOAuthIdentity(req.Context(), ident.ID)
+		if err != nil {
+			log.Printf("Warning: Failed to get OAuth identity for user %d: %v", ident.ID, err)
+		} else if provider != "" {
+			ident.Provider = provider
+			if username != "" && ident.Username == "" {
+				ident.Username = username
+			}
+		}
+	}
+	
 	state.Identity = ident
 
 	userState, err := s.DB.GetUserState(req.Context(), ident)
@@ -148,6 +240,9 @@ func (s *Server) authenticateState(wr http.ResponseWriter, req *http.Request, st
 		return false
 	}
 	state.UserState = userState
+	
+	// Set SuperAdmin flag
+	state.SuperAdmin = s.isSuperAdmin(req.Context(), ident)
 
 	return true
 }
