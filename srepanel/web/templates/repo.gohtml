@@ -3,12 +3,68 @@
 <head>
     <title>Ghidra Panel - {{ .Repo.Name }}</title>
     {{ template "head.gohtml" }}
+    <style>
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .stat-card {
+            background: var(--card-background-color);
+            border: 1px solid var(--card-border-color);
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--primary);
+            display: block;
+        }
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--muted-color);
+            margin-top: 0.25rem;
+            display: block;
+        }
+    </style>
 </head>
 <body>
 {{ template "nav.gohtml" . }}
 <main class="container">
     <h1>{{ .Repo.Name }}</h1>
     {{ template "status.gohtml" . }}
+    
+    {{ if .Repo.Stats }}
+    <article>
+        <header><strong>Repository Stats</strong></header>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <span class="stat-value">{{ .Repo.Stats.UserCount }}</span>
+                <span class="stat-label">👥 Users</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value">{{ .Repo.Stats.FileCount }}</span>
+                <span class="stat-label">📁 Files</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value">{{ formatDate .Repo.Stats.LastModifiedTime }}</span>
+                <span class="stat-label">📅 Last Modified</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value">{{ formatSize .Repo.Stats.SizeBytes }}</span>
+                <span class="stat-label">💾 Size</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value">{{ formatDate .Repo.Stats.CreatedTime }}</span>
+                <span class="stat-label">🎂 Created</span>
+            </div>
+        </div>
+    </article>
+    {{ end }}
+    
     <div class="grid">
         <article>
             <header>

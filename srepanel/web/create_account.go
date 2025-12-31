@@ -1,9 +1,17 @@
 package web
 
 import (
-	"go.mkw.re/ghidra-panel/ghidra"
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
 	"log"
 	"net/http"
+	"net/url"
+	"strconv"
+
+	"go.mkw.re/ghidra-panel/ghidra"
+	"go.mkw.re/ghidra-panel/passphrase"
+	"go.mkw.re/ghidra-panel/username"
 )
 
 func (s *Server) handleCreateAccount(wr http.ResponseWriter, req *http.Request) {
@@ -18,24 +26,10 @@ func (s *Server) handleCreateAccount(wr http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	if err := req.ParseForm(); err != nil {
-		http.Error(wr, "Bad request", http.StatusBadRequest)
-		return
-	}
-	user := req.PostForm.Get("username")
-	pass := req.PostForm.Get("password")
+	// Auto-generate pseudonymous username
+	user := username.GeneratePseudonymous(ident.Provider, ident.Username, strconv.FormatUint(ident.ID, 10))
 
-	// Fallback to the Discord username if no username is provided
-	if user == "" {
-		user = ident.Username
-	}
-
-	// Check for missing form data
-	if user == "" || pass == "" {
-		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "missing_fields"}), http.StatusSeeOther)
-		return
-	}
-
+	// Check for collision (extremely rare with SHA-256)
 	exists, err := s.DB.UsernameExists(req.Context(), user)
 	if err != nil {
 		log.Println("Failed to check if username exists:", err)
@@ -43,12 +37,21 @@ func (s *Server) handleCreateAccount(wr http.ResponseWriter, req *http.Request) 
 		return
 	}
 	if exists {
-		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "username_exists"}), http.StatusSeeOther)
+		// Add random suffix in the extremely rare case of collision
+		suffix := make([]byte, 2)
+		rand.Read(suffix)
+		user = user + "_" + hex.EncodeToString(suffix)
+	}
+
+	// Auto-generate secure passphrase
+	pass, err := passphrase.Generate()
+	if err != nil {
+		log.Println("Failed to generate passphrase:", err)
+		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
 		return
 	}
 
-	// If there's an existing Ghidra account, make sure the password matches
-	// The gRPC backend will use case-insensitive matching for the username
+	// Check if Ghidra account already exists (shouldn't happen with auto-generated usernames)
 	request := ghidra.AuthenticateUserRequest{
 		Username: user,
 		Password: pass,
@@ -59,37 +62,59 @@ func (s *Server) handleCreateAccount(wr http.ResponseWriter, req *http.Request) 
 		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
 		return
 	}
-	// If the returned username is empty, the account doesn't exist
+	// If account exists, this is unexpected (collision in username generation)
 	if auth.Username != "" {
-		if auth.Success {
-			// Use the Ghidra username
-			user = auth.Username
-		} else {
-			http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "link_failed"}), http.StatusSeeOther)
-			return
-		}
-	}
-
-	// Create the account in the database
-	if err := s.DB.CreateAccount(req.Context(), ident.ID, user, pass); err != nil {
-		log.Println("Failed to create account for user:", err)
+		log.Printf("Unexpected: Ghidra account %s already exists", user)
 		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
 		return
 	}
 
-	// Create the account in Ghidra if it doesn't exist
-	if auth.Username == "" {
-		_, err = s.Client.AddUser(req.Context(), &ghidra.AddUserRequest{Username: user})
-		if err != nil {
-			log.Println("Failed to create account:", err)
+	// Create the account in the database
+	// Check if this is the first user and should be made admin
+	count, err := s.DB.CountAccounts(req.Context())
+	if err != nil {
+		log.Println("Failed to count accounts:", err)
+		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
+		return
+	}
+
+	log.Printf("Creating Ghidra account for %s (provider: %s, ID: %d). Existing accounts: %d", ident.Username, ident.Provider, ident.ID, count)
+
+	if count == 0 && s.Config.FirstUserIsAdmin {
+		// First user gets admin privileges
+		log.Printf("→ Granting super admin privileges (first user)")
+		if err := s.DB.CreateAccountAsSuperAdmin(req.Context(), ident.ID, user, pass, ident.Provider); err != nil {
+			log.Println("Failed to create admin account for user:", err)
+			http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
+			return
+		}
+		log.Printf("✓ Super admin account created: %s", user)
+	} else {
+		if err := s.DB.CreateAccount(req.Context(), ident.ID, user, pass, ident.Provider); err != nil {
+			log.Println("Failed to create account for user:", err)
 			http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
 			return
 		}
 	}
 
-	if auth.Success {
-		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "link_success"}), http.StatusSeeOther)
-	} else {
-		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "create_account_success"}), http.StatusSeeOther)
+	// Create the account in Ghidra
+	_, err = s.Client.AddUser(req.Context(), &ghidra.AddUserRequest{Username: user})
+	if err != nil {
+		log.Println("Failed to create Ghidra account:", err)
+		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
+		return
 	}
+
+	log.Printf("Created account for user %s (OAuth: %s/%d)", user, ident.Provider, ident.ID)
+
+	// Log account creation
+	s.logAudit(req.Context(), req, "account_created", "user", user, true, map[string]interface{}{
+		"provider": ident.Provider,
+		"is_admin": count == 0 && s.Config.FirstUserIsAdmin,
+	})
+
+	// Redirect to credentials page with auto-generated username and passphrase
+	credentialsUrl := fmt.Sprintf("/credentials?username=%s&password=%s&first_time=1",
+		url.QueryEscape(user), url.QueryEscape(pass))
+	http.Redirect(wr, req, credentialsUrl, http.StatusSeeOther)
 }

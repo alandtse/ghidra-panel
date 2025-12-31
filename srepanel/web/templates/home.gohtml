@@ -3,19 +3,113 @@
 <head>
   <title>Ghidra Panel - Home</title>
   {{ template "head.gohtml" }}
+  <style>
+    .role-checkboxes {
+      display: inline-flex;
+      gap: 1rem;
+      align-items: center;
+      margin-left: 1rem;
+      font-size: 0.9em;
+    }
+    .role-checkboxes label {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      margin: 0;
+      cursor: default;
+    }
+    .role-checkboxes input[type="checkbox"] {
+      margin: 0;
+      cursor: default;
+      pointer-events: none;
+    }
+    .admin-toggle {
+      margin-bottom: 1rem;
+    }
+  </style>
 </head>
 <body>
 {{ template "nav.gohtml" . }}
 <main class="container">
   <h1>Hi, {{ .Identity.Username }}!</h1>
   {{ template "status.gohtml" . }}
+  
+  {{ if .SuperAdmin }}
+  <article style="border-left: 4px solid {{ permColor 2 }}; background: rgba(76, 175, 80, 0.05);">
+    <header>
+      <strong>🔑 Panel Super Admin</strong>
+    </header>
+    <p>You have super admin privileges and can manage all repositories and users.</p>
+    {{ if .GhidraOnline }}
+    <p><small>✓ Ghidra server is online — You can manage all repositories below</small></p>
+    {{ else }}
+    <p><small>⚠ Ghidra server is offline — Repository management will be available when the server is online</small></p>
+    {{ end }}
+    <div class="admin-toggle">
+      <label>
+        <input type="checkbox" id="adminModeToggle" onchange="toggleAdminMode(this.checked)" {{ if not .AdminModeDisabled }}checked{{ end }}>
+        View as Admin (show all repositories and management options)
+      </label>
+    </div>
+  </article>
+  {{ end }}
+  
+  {{ if .SuperAdmin }}
+  <article>
+    <header>
+      <strong>Repository Access</strong>
+      <small style="color: {{ permColor 2 }}">(Admin access to all repos)</small>
+    </header>
+    {{ if .ACL | len  }}
+    <figure>
+      <table>
+        <thead>
+          <tr>
+            <th>Repository</th>
+            <th>Access</th>
+            <th>👥 Users</th>
+            <th>📁 Files</th>
+            <th>💾 Size</th>
+            <th>📅 Updated</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{ range $acl := .ACL }}
+          <tr>
+            <td>
+              {{ if .IsAdmin }}
+              <a href="/repos/{{ .Repo }}"><samp>{{ .Repo }}</samp></a>
+              {{ else }}
+              <samp>{{ .Repo }}</samp>
+              {{ end }}
+            </td>
+            <td>
+              <div class="role-checkboxes">
+                <label title="Read-Only"><input type="checkbox" {{ if or (eq .Perm 0) (eq .Perm 1) (eq .Perm 2) }}checked{{ end }} disabled>R</label>
+                <label title="Read/Write"><input type="checkbox" {{ if or (eq .Perm 1) (eq .Perm 2) }}checked{{ end }} disabled>W</label>
+                <label title="Admin"><input type="checkbox" {{ if eq .Perm 2 }}checked{{ end }} disabled>A</label>
+              </div>
+            </td>
+            <td>{{ if .Stats }}{{ .Stats.UserCount }}{{ else }}-{{ end }}</td>
+            <td>{{ if .Stats }}{{ .Stats.FileCount }}{{ else }}-{{ end }}</td>
+            <td>{{ if .Stats }}{{ formatSize .Stats.SizeBytes }}{{ else }}-{{ end }}</td>
+            <td>{{ if .Stats }}{{ formatDate .Stats.LastModifiedTime }}{{ else }}-{{ end }}</td>
+          </tr>
+          {{ end }}
+        </tbody>
+      </table>
+    </figure>
+    {{ else }}
+    <p>Your account doesn't have access to any repositories yet.</p>
+    {{ end }}
+  </article>
+  {{ end }}
+
+  {{ if not .SuperAdmin }}
   <div class="grid">
   <article>
     <header>
       <strong>Repository Access</strong>
-      {{ if .SuperAdmin }}
-      <small style="color: {{ permColor 2 }}">(Super admin mode)</small>
-      {{ end }}
     </header>
     {{ if .ACL | len  }}
     <ul class="list">
@@ -26,16 +120,35 @@
         {{ else }}
         <samp>{{ .Repo }}</samp>
         {{ end }}
-        <span style="color: {{ permColor .Perm }}">{{ permDisplay .Perm }}</span>
+        <div class="role-checkboxes">
+          <label title="Read-Only Access">
+            <input type="checkbox" {{ if or (eq .Perm 0) (eq .Perm 1) (eq .Perm 2) }}checked{{ end }} disabled>
+            Read
+          </label>
+          <label title="Read/Write Access">
+            <input type="checkbox" {{ if or (eq .Perm 1) (eq .Perm 2) }}checked{{ end }} disabled>
+            Write
+          </label>
+          <label title="Admin Access">
+            <input type="checkbox" {{ if eq .Perm 2 }}checked{{ end }} disabled>
+            Admin
+          </label>
+        </div>
       </li>
       {{ end }}
     </ul>
     {{ else }}
     <p>Your account doesn't have access to any repositories yet.</p>
     {{ end }}
+  </article>
+  
+  <article>
     {{ if .UserState.HasPassword }}
+    <header>
+      <strong>Request Access</strong>
+    </header>
     <form action="/request_access" method="post">
-      <label for="repo">Repositories</label>
+      <label for="repo">Repository</label>
       <select id="repo" name="repo" required>
         <option value="" disabled selected>Select a repository...</option>
         {{ range $repo := .Repos }}
@@ -53,69 +166,122 @@
         <button role="button" type="submit" class="outline">Request</button>
       </div>
     </form>
-    {{ end }}
-  </article>
-  <article>
-    {{ if not .UserState.HasPassword }}
+    {{ else if not .UserState.HasPassword }}
     <header>
-      <strong>Ghidra Account</strong>
+      <strong>Welcome!</strong>
     </header>
+    <p>Create your Ghidra account to start collaborating. A secure username and passphrase will be automatically generated for you.</p>
     <form action="/create_account" method="post">
-      <p>If you have an existing account, enter the credentials here.</p>
-
-      <label for="create-username">Username</label>
-      {{ if ne .GhidraUsername "" }}
-      <input id="create-username" type="text" name="username" value="{{ .GhidraUsername }}" disabled>
-      <small>An existing Ghidra account with this username was found.</small>
-      {{ else }}
-      <input id="create-username" type="text" name="username" value="{{ .UserState.Username }}" required>
-      <small>Username is case-sensitive and cannot be changed.</small>
-      {{ end }}
-
-      <label for="create-password">Password</label>
-      <input id="create-password" type="password" name="password" required>
-      <small>Please do not share your password with anyone else.</small>
-
-      <div class="grid">
-        {{ if ne .GhidraUsername "" }}
-        <button role="button" type="submit">Link</button>
-        {{ else }}
-        <button role="button" type="submit">Create</button>
-        {{ end }}
-      </div>
+      <button role="button" type="submit">
+        <i class="fa fa-user-plus"></i> Create Ghidra Account
+      </button>
     </form>
+    <small>
+      <i class="fa fa-shield-alt"></i> Your account will be securely linked to your <strong>{{ .Identity.Provider }}</strong> profile for accountability.
+    </small>
     {{ else }}
     <header>
       <strong>Connection Information</strong>
     </header>
+    <div class="grid">
+      <label>
+        Hostname
+        <input type="text" value="{{ .Ghidra.Hostname }}" readonly>
+      </label>
+      <label>
+        Port
+        <input type="text" value="{{ .Ghidra.Port }}" readonly>
+      </label>
+    </div>
+    <small>Server version: {{ .GhidraVersion }}</small>
+
+    <label>Username</label>
+    <input type="text" value="{{ .UserState.Username }}" readonly>
+    <small>
+      <i class="fa fa-lock"></i> Your username is linked to your <strong>{{ .Identity.Provider }}</strong> account and cannot be changed.
+    </small>
+
     <form action="/update_account" method="post">
-      <div class="grid">
-        <label for="hostname">
-          Hostname
-          <input id="hostname" type="text" value="{{ .Ghidra.Hostname }}" disabled>
-        </label>
-        <label for="port">
-          Port
-          <input id="port" type="text" value="{{ .Ghidra.Port }}" disabled>
-        </label>
-      </div>
-      <small>Server version: {{ .GhidraVersion }}</small>
-
-      <label for="update-username">Username</label>
-      <input id="update-username" type="text" name="username" value="{{ .UserState.Username }}" disabled>
-      <small>Username is case-sensitive and cannot be changed.</small>
-
-      <label for="update-password">Password</label>
-      <div class="password_row">
-        <input id="update-password" type="password" name="password" placeholder="Enter new password..." required>
-        <button role="button" type="submit" class="outline">Update</button>
-      </div>
-      <small>Please do not share your password with anyone else.</small>
+      <label>Password</label>
+      <button role="button" type="submit" class="outline">
+        <i class="fa fa-sync-alt"></i> Get New Password
+      </button>
+      <small>
+        <i class="fa fa-info-circle"></i> Click to generate a new password anytime you need to see it (e.g., to login to Ghidra).
+        <br><strong>Tip:</strong> Save the password to your password manager after generating.
+      </small>
     </form>
     {{ end }}
   </article>
   </div>
+  {{ end }}
+
+  {{ if .UserState.HasPassword }}
+  <div class="grid">
+    <article>
+      <header>
+        <strong>Connection Information</strong>
+      </header>
+      <div class="grid">
+        <label>
+          Hostname
+          <input type="text" value="{{ .Ghidra.Hostname }}" readonly>
+        </label>
+        <label>
+          Port
+          <input type="text" value="{{ .Ghidra.Port }}" readonly>
+        </label>
+      </div>
+      <small>Server version: {{ .GhidraVersion }}</small>
+
+      <label>Username</label>
+      <input type="text" value="{{ .UserState.Username }}" readonly>
+      <small>
+        <i class="fa fa-lock"></i> Your username is linked to your <strong>{{ .Identity.Provider }}</strong> account and cannot be changed.
+      </small>
+    </article>
+
+    <article>
+      <header>
+        <strong>Password Management</strong>
+      </header>
+      <form action="/update_account" method="post">
+        <label>Password</label>
+        <button role="button" type="submit" class="outline">
+          <i class="fa fa-sync-alt"></i> Get New Password
+        </button>
+        <small>
+          <i class="fa fa-info-circle"></i> Click to generate a new password anytime you need to see it (e.g., to login to Ghidra).
+          <br><strong>Tip:</strong> Save the password to your password manager after generating.
+        </small>
+      </form>
+    </article>
+  </div>
+  {{ end }}
 </main>
+
+<script>
+function toggleAdminMode(enabled) {
+  // Store preference in sessionStorage
+  sessionStorage.setItem('adminMode', enabled ? 'true' : 'false');
+  
+  // Reload page to apply the filter
+  window.location.href = '/?admin_mode=' + (enabled ? '1' : '0');
+}
+
+// Restore admin mode toggle state on page load
+document.addEventListener('DOMContentLoaded', function() {
+  const toggle = document.getElementById('adminModeToggle');
+  if (toggle) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const adminMode = urlParams.get('admin_mode');
+    if (adminMode !== null) {
+      toggle.checked = adminMode === '1';
+    }
+  }
+});
+</script>
+
 {{ template "footer.gohtml" . }}
 </body>
 </html>

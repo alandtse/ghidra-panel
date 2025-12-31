@@ -6,7 +6,6 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 	"log"
 	"net/http"
-	"slices"
 	"sort"
 )
 
@@ -19,6 +18,7 @@ type RepoState struct {
 	QueryUser  string
 	QueryRole  string
 	CanDelete  bool
+	IsAdmin    bool
 }
 
 func (s *Server) handleRepo(wr http.ResponseWriter, req *http.Request) {
@@ -36,7 +36,7 @@ func (s *Server) handleRepo(wr http.ResponseWriter, req *http.Request) {
 	if !s.authenticateState(wr, req, state.State) {
 		return
 	}
-	isSuperAdmin := slices.Contains(s.Config.SuperAdmins, state.Identity.ID)
+	isSuperAdmin := s.isSuperAdmin(req.Context(), state.Identity)
 
 	// Fetch repository information from the database
 	info, err := s.DB.GetRepository(req.Context(), repoName)
@@ -60,6 +60,16 @@ func (s *Server) handleRepo(wr http.ResponseWriter, req *http.Request) {
 	for _, r := range reply.Repositories {
 		if r.Name == repoName {
 			repo = r
+			// Copy stats from gRPC response to our common type
+			if r.Stats != nil {
+				state.Repo.Stats = &common.RepositoryStats{
+					SizeBytes:        r.Stats.SizeBytes,
+					FileCount:        r.Stats.FileCount,
+					UserCount:        r.Stats.UserCount,
+					CreatedTime:      r.Stats.CreatedTime,
+					LastModifiedTime: r.Stats.LastModifiedTime,
+				}
+			}
 			break
 		}
 	}
@@ -85,6 +95,7 @@ func (s *Server) handleRepo(wr http.ResponseWriter, req *http.Request) {
 
 	// Repository can be deleted if the user is a super admin, or if the user is the only admin
 	state.CanDelete = isSuperAdmin || len(repo.Users) == 1
+	state.IsAdmin = isSuperAdmin
 
 	// Query for repository access
 	state.ACL = make([]common.RepoUserAccessDisplay, 0)

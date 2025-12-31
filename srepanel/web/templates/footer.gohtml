@@ -1,7 +1,20 @@
 <footer class="container-fluid">
-  <aside>
-    {{ range $link := .Links }}
-    <a href="{{ $link.URL }}" class="secondary">{{ $link.Name }}</a>
-    {{ end }}
-  </aside>
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+    <aside>
+      {{ range $link := .Links }}
+      <a href="{{ $link.URL }}" class="secondary">{{ $link.Name }}</a>
+      {{ end }}
+    </aside>
+    <small style="opacity: 0.8;">
+      {{ if .GhidraOnline }}
+      <span style="color: #4caf50;">● Ghidra Server Online</span>
+      {{ if .GhidraVersion }}<span style="opacity: 0.7;"> ({{ .GhidraVersion }})</span>{{ end }}
+      {{ else }}
+      <span style="color: #ff9800;">● Ghidra Server Offline</span>
+      {{ end }}
+      {{ if .Ghidra }}
+      <span style="opacity: 0.6;"> — {{ .Ghidra.Hostname }}:{{ .Ghidra.Port }}</span>
+      {{ end }}
+    </small>
+  </div>
 </footer>

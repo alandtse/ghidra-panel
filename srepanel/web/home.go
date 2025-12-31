@@ -6,18 +6,18 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 	"log"
 	"net/http"
-	"slices"
 	"sort"
 	"strings"
 )
 
 type HomeState struct {
 	*State
-	ACL            []common.UserRepoAccessDisplay
-	GhidraUsername string
-	GhidraVersion  string
-	Repos          []string
-	SuperAdmin     bool
+	ACL               []common.UserRepoAccessDisplay
+	GhidraUsername    string
+	GhidraVersion     string
+	Repos             []string
+	SuperAdmin        bool
+	AdminModeDisabled bool
 }
 
 func (s *Server) handleHome(wr http.ResponseWriter, req *http.Request) {
@@ -30,13 +30,32 @@ func (s *Server) handleHome(wr http.ResponseWriter, req *http.Request) {
 	if !s.authenticateState(wr, req, state.State) {
 		return
 	}
-	state.SuperAdmin = slices.Contains(s.Config.SuperAdmins, state.Identity.ID)
+	state.SuperAdmin = s.isSuperAdmin(req.Context(), state.Identity)
+	
+	// Check if admin mode is disabled via query parameter
+	adminModeParam := req.URL.Query().Get("admin_mode")
+	state.AdminModeDisabled = adminModeParam == "0"
+	
+	// If admin mode is disabled, treat as regular user for repository listing
+	viewAsAdmin := state.SuperAdmin && !state.AdminModeDisabled
+	
+	if s.Config.Dev {
+		log.Printf("Home page: User %s (ID: %d, Provider: %s) - SuperAdmin: %v, ViewAsAdmin: %v", 
+			state.Identity.Username, state.Identity.ID, state.Identity.Provider, state.SuperAdmin, viewAsAdmin)
+	}
 
 	// Fetch repository and user information from Ghidra
 	reply, err := s.Client.GetRepositories(req.Context(), &emptypb.Empty{})
 	if err != nil {
-		log.Println("Failed to fetch repositories:", err)
-		s.renderError(wr, http.StatusInternalServerError, "Failed to fetch repositories.", state.State)
+		// Log the error but continue - allow access to panel features without Ghidra server
+		log.Println("Warning: Failed to fetch repositories (Ghidra server may be offline):", err)
+		state.GhidraVersion = "Unavailable (Ghidra server offline)"
+		// Render home page with empty repository list
+		err = homePage.Execute(wr, state)
+		if err != nil {
+			// Don't call renderError here - template may have already written headers
+			log.Println("Failed to serve home:", err)
+		}
 		return
 	}
 
@@ -57,7 +76,17 @@ func (s *Server) handleHome(wr http.ResponseWriter, req *http.Request) {
 		acl := common.UserRepoAccessDisplay{
 			Repo:    r.Name,
 			Perm:    ghidra.Permission_NONE,
-			IsAdmin: state.SuperAdmin,
+			IsAdmin: viewAsAdmin,
+		}
+		// Copy stats if available
+		if r.Stats != nil {
+			acl.Stats = &common.RepositoryStats{
+				SizeBytes:        r.Stats.SizeBytes,
+				FileCount:        r.Stats.FileCount,
+				UserCount:        r.Stats.UserCount,
+				CreatedTime:      r.Stats.CreatedTime,
+				LastModifiedTime: r.Stats.LastModifiedTime,
+			}
 		}
 		for _, u := range r.Users {
 			if strings.EqualFold(u.User.Username, state.UserState.Username) {
@@ -68,7 +97,8 @@ func (s *Server) handleHome(wr http.ResponseWriter, req *http.Request) {
 				break
 			}
 		}
-		if acl.IsAdmin || acl.Perm != ghidra.Permission_NONE {
+		// If viewing as admin, show all repos. Otherwise only show repos with access
+		if viewAsAdmin || acl.Perm != ghidra.Permission_NONE {
 			state.ACL = append(state.ACL, acl)
 		}
 	}
@@ -83,7 +113,7 @@ func (s *Server) handleHome(wr http.ResponseWriter, req *http.Request) {
 
 	err = homePage.Execute(wr, state)
 	if err != nil {
+		// Don't call renderError here - template may have already written headers
 		log.Println("Failed to serve home:", err)
-		s.renderError(wr, http.StatusInternalServerError, "Failed to render page.", state.State)
 	}
 }

@@ -92,6 +92,11 @@ func (s *Server) handleRequestAccess(wr http.ResponseWriter, req *http.Request) 
 	}
 	defer res.Body.Close()
 
+	// Log access request
+	s.logAudit(req.Context(), req, "access_requested", "repository", repo, true, map[string]interface{}{
+		"role": ghidra.Permission_name[int32(newPerm)],
+	})
+
 	http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "request_success"}), http.StatusSeeOther)
 }
 
