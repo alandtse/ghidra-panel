@@ -1,12 +1,27 @@
 GO?=go
-GO_SOURCES:=$(shell find . -type f -not -path './srepanel')
+
+# Enable CGO for SQLite support
+export CGO_ENABLED=1
+
+# Detect OS
+ifeq ($(OS),Windows_NT)
+    BINARY=srepanel.exe
+    SHELL=cmd
+else
+    BINARY=srepanel
+endif
 
 .PHONY: build
-build: srepanel
+build: $(BINARY)
 
-srepanel: $(GO_SOURCES) go.mod go.sum
+srepanel: go.mod go.sum
+	$(GO) build -o $@ .
+
+srepanel.exe: go.mod go.sum
 	$(GO) build -o $@ .
 
 .PHONY: clean
 clean:
-	rm -f srepanel
+	-$(GO) clean
+	-del /Q srepanel.exe 2>nul
+	-del /Q srepanel 2>nul
