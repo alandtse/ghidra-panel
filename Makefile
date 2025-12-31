@@ -71,12 +71,35 @@ show-providers:
 	@echo "OAuth Providers in config.yaml:"
 	@grep -A 1 'enabled: true' config.yaml | grep 'type:' | sed 's/.*type: \(.*\)/  - \1/' || echo "  (install grep/sed for this feature)"
 
+# Run Go tests
+.PHONY: test
+test:
+	$(MAKE) -C srepanel test
+
+# Run tests with coverage
+.PHONY: test-coverage
+test-coverage:
+	$(MAKE) -C srepanel test-coverage
+
+# Run Go linter
+.PHONY: lint
+lint:
+	$(MAKE) -C srepanel lint
+
+# Run all checks (tests + lint)
+.PHONY: check
+check: test lint
+
 # Help target
 .PHONY: help
 help:
 	@echo "Available targets:"
 	@echo "  make build          - Build the srepanel binary"
 	@echo "  make jaas           - Build JAAS plugin for Ghidra Server"
+	@echo "  make test           - Run all tests"
+	@echo "  make test-coverage  - Run tests with coverage report"
+	@echo "  make lint           - Run code linter"
+	@echo "  make check          - Run tests and linter"
 	@echo "  make dev            - Build and run dev server (keeps existing database)"
 	@echo "  make dev-clean      - Build and run dev server (fresh database - clean slate)"
 	@echo "  make dev-config     - Run dev server with custom config (Usage: make dev-config CONFIG=myconfig.yaml)"

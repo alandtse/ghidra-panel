@@ -1,0 +1,128 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-go:
+    name: Go Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+        cache-dependency-path: srepanel/go.sum
+
+    - name: Download dependencies
+      working-directory: ./srepanel
+      run: go mod download
+
+    - name: Run tests
+      working-directory: ./srepanel
+      run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+
+    - name: Generate coverage report
+      working-directory: ./srepanel
+      run: go tool cover -html=coverage.out -o coverage.html
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./srepanel/coverage.out
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+    - name: Upload coverage artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: srepanel/coverage.html
+
+  test-java:
+    name: Java Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 25
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '25'
+        cache: 'gradle'
+
+    - name: Grant execute permission for gradlew
+      working-directory: ./jaas
+      run: chmod +x gradlew
+
+    - name: Run tests
+      working-directory: ./jaas
+      run: ./gradlew test
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: java-test-results
+        path: jaas/build/reports/tests/
+
+  lint-go:
+    name: Go Lint
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+        cache-dependency-path: srepanel/go.sum
+
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: latest
+        working-directory: srepanel
+        args: --timeout=5m
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+        cache-dependency-path: srepanel/go.sum
+
+    - name: Build panel
+      working-directory: ./srepanel
+      run: go build -v .
+
+    - name: Set up JDK 25
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '25'
+        cache: 'gradle'
+
+    - name: Build JAAS plugin
+      working-directory: ./jaas
+      run: ./gradlew build -x test
