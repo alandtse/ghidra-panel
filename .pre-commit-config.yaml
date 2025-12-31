@@ -5,3 +5,31 @@ repos:
     - id: check-yaml
     - id: end-of-file-fixer
     - id: trailing-whitespace
+    - id: check-added-large-files
+      args: ['--maxkb=1000']
+    - id: check-merge-conflict
+    - id: detect-private-key
+
+  # Go-specific hooks
+  - repo: https://github.com/dnephin/pre-commit-golang
+    rev: v0.5.1
+    hooks:
+    - id: go-fmt
+      args: [-w]
+      files: \.go$
+    - id: go-imports
+      args: [-w]
+      files: \.go$
+    - id: go-vet
+      files: \.go$
+    - id: go-unit-tests
+      args: [-timeout=5m]
+      files: \.go$
+      pass_filenames: false
+
+  # Optional: golangci-lint (more comprehensive but slower)
+  # - repo: https://github.com/golangci/golangci-lint
+  #   rev: v1.55.2
+  #   hooks:
+  #   - id: golangci-lint
+  #     args: [--timeout=5m]
