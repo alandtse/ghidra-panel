@@ -26,6 +26,12 @@ ghidra_panel.secrets.json
 /srepanel/test_generation.go
 /test_generation.go
 
+# Test coverage reports
+coverage.out
+coverage.html
+coverage
+*.coverprofile
+
 # Common junk
 .idea/
 .vscode/
