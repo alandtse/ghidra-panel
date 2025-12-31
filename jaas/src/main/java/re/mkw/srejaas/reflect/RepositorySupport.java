@@ -27,7 +27,8 @@ public class RepositorySupport {
       try {
         Field field = Repository.class.getDeclaredField("userMap");
         field.setAccessible(true);
-        getUserMap = MethodHandles.lookup().unreflectGetter(field);
+        MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(Repository.class, MethodHandles.lookup());
+        getUserMap = lookup.unreflectGetter(field);
       } catch (NoSuchFieldException | IllegalAccessException e) {
         throw new RuntimeException(e);
       }
@@ -48,7 +49,8 @@ public class RepositorySupport {
       try {
         Method method = Repository.class.getDeclaredMethod("setUserPermission", String.class, int.class);
         method.setAccessible(true);
-        setUserPermission = MethodHandles.lookup().unreflect(method);
+        MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(Repository.class, MethodHandles.lookup());
+        setUserPermission = lookup.unreflect(method);
       } catch (NoSuchMethodException | IllegalAccessException e) {
         throw new RuntimeException(e);
       }
@@ -68,7 +70,8 @@ public class RepositorySupport {
       try {
         Method method = Repository.class.getDeclaredMethod("removeUser", String.class);
         method.setAccessible(true);
-        removeUser = MethodHandles.lookup().unreflect(method);
+        MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(Repository.class, MethodHandles.lookup());
+        removeUser = lookup.unreflect(method);
       } catch (NoSuchMethodException | IllegalAccessException e) {
         throw new RuntimeException(e);
       }
@@ -88,7 +91,8 @@ public class RepositorySupport {
       try {
         Field field = Repository.class.getDeclaredField("rootFolder");
         field.setAccessible(true);
-        getRootFolder = MethodHandles.lookup().unreflectGetter(field);
+        MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(Repository.class, MethodHandles.lookup());
+        getRootFolder = lookup.unreflectGetter(field);
       } catch (NoSuchFieldException | IllegalAccessException e) {
         throw new RuntimeException(e);
       }
@@ -105,7 +109,8 @@ public class RepositorySupport {
       try {
         Field field = Repository.class.getDeclaredField("fileSystem");
         field.setAccessible(true);
-        getFileSystem = MethodHandles.lookup().unreflectGetter(field);
+        MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(Repository.class, MethodHandles.lookup());
+        getFileSystem = lookup.unreflectGetter(field);
       } catch (NoSuchFieldException | IllegalAccessException e) {
         throw new RuntimeException(e);
       }
@@ -122,7 +127,8 @@ public class RepositorySupport {
       try {
         Field field = Repository.class.getDeclaredField("valid");
         field.setAccessible(true);
-        getValid = MethodHandles.lookup().unreflectGetter(field);
+        MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(Repository.class, MethodHandles.lookup());
+        getValid = lookup.unreflectGetter(field);
       } catch (NoSuchFieldException | IllegalAccessException e) {
         throw new RuntimeException(e);
       }
@@ -139,7 +145,8 @@ public class RepositorySupport {
       try {
         Field field = Repository.class.getDeclaredField("valid");
         field.setAccessible(true);
-        setValid = MethodHandles.lookup().unreflectSetter(field);
+        MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(Repository.class, MethodHandles.lookup());
+        setValid = lookup.unreflectSetter(field);
       } catch (NoSuchFieldException | IllegalAccessException e) {
         throw new RuntimeException(e);
       }
@@ -158,7 +165,8 @@ public class RepositorySupport {
       try {
         Method method = Repository.class.getDeclaredMethod("dispose");
         method.setAccessible(true);
-        dispose = MethodHandles.lookup().unreflect(method);
+        MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(Repository.class, MethodHandles.lookup());
+        dispose = lookup.unreflect(method);
       } catch (NoSuchMethodException | IllegalAccessException e) {
         throw new RuntimeException(e);
       }

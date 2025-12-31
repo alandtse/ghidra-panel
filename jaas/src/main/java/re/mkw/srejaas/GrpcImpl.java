@@ -235,15 +235,86 @@ public class GrpcImpl extends GhidraGrpc.GhidraImplBase {
   private Repository buildRepository(ghidra.server.Repository repository) {
     LocalFileSystem fileSystem = RepositorySupport.getFileSystem(repository);
     File root = LocalFileSystemSupport.getRoot(fileSystem);
+    ghidra.framework.remote.User[] users = RepositorySupport.getRepositoryUsers(repository);
+    
+    // Build repository stats
+    RepositoryStats stats = buildRepositoryStats(root, users.length);
+    
     return Repository.newBuilder()
         .setName(repository.getName())
         .setPath(root.getAbsolutePath())
         .setAnonymousAccessAllowed(repository.anonymousAccessAllowed())
         .addAllUsers(
-            Arrays.stream(RepositorySupport.getRepositoryUsers(repository))
+            Arrays.stream(users)
                 .map(this::buildUserWithPermission)
                 .toList()
         )
+        .setStats(stats)
         .build();
+  }
+
+  private RepositoryStats buildRepositoryStats(File repoRoot, int userCount) {
+    RepositoryStats.Builder builder = RepositoryStats.newBuilder();
+    
+    builder.setUserCount(userCount);
+    
+    if (repoRoot != null && repoRoot.exists()) {
+      // Get creation/modification times and calculate size
+      long createdTime = repoRoot.lastModified(); // Best approximation for creation
+      long lastModifiedTime = repoRoot.lastModified();
+      long totalSize = 0;
+      int fileCount = 0;
+      
+      // Recursively calculate size and count files
+      try {
+        DirStats stats = calculateDirStats(repoRoot);
+        totalSize = stats.size;
+        fileCount = stats.fileCount;
+        lastModifiedTime = Math.max(lastModifiedTime, stats.lastModified);
+      } catch (Exception e) {
+        log.warn("Failed to calculate repository stats for " + repoRoot.getAbsolutePath(), e);
+      }
+      
+      builder.setSizeBytes(totalSize);
+      builder.setCreatedTime(createdTime);
+      builder.setLastModifiedTime(lastModifiedTime);
+      builder.setFileCount(fileCount);
+    }
+    
+    return builder.build();
+  }
+
+  private static class DirStats {
+    long size = 0;
+    int fileCount = 0;
+    long lastModified = 0;
+  }
+
+  private DirStats calculateDirStats(File dir) {
+    DirStats stats = new DirStats();
+    
+    if (!dir.exists() || !dir.isDirectory()) {
+      return stats;
+    }
+    
+    File[] files = dir.listFiles();
+    if (files == null) {
+      return stats;
+    }
+    
+    for (File file : files) {
+      if (file.isFile()) {
+        stats.size += file.length();
+        stats.fileCount++;
+        stats.lastModified = Math.max(stats.lastModified, file.lastModified());
+      } else if (file.isDirectory()) {
+        DirStats subStats = calculateDirStats(file);
+        stats.size += subStats.size;
+        stats.fileCount += subStats.fileCount;
+        stats.lastModified = Math.max(stats.lastModified, subStats.lastModified);
+      }
+    }
+    
+    return stats;
   }
 }

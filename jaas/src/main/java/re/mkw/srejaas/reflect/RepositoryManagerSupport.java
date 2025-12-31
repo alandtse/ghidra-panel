@@ -25,7 +25,8 @@ public class RepositoryManagerSupport {
       try {
         Method method = RepositoryManager.class.getDeclaredMethod("getRootDir");
         method.setAccessible(true);
-        getRootDir = MethodHandles.lookup().unreflect(method);
+        MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(RepositoryManager.class, MethodHandles.lookup());
+        getRootDir = lookup.unreflect(method);
       } catch (NoSuchMethodException | IllegalAccessException e) {
         throw new RuntimeException(e);
       }
@@ -42,7 +43,8 @@ public class RepositoryManagerSupport {
       try {
         Method method = RepositoryManager.class.getDeclaredMethod("getRepository", String.class);
         method.setAccessible(true);
-        getRepository = MethodHandles.lookup().unreflect(method);
+        MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(RepositoryManager.class, MethodHandles.lookup());
+        getRepository = lookup.unreflect(method);
       } catch (NoSuchMethodException | IllegalAccessException e) {
         throw new RuntimeException(e);
       }
@@ -59,7 +61,8 @@ public class RepositoryManagerSupport {
       try {
         Method method = RepositoryManager.class.getDeclaredMethod("getRepositoryNames");
         method.setAccessible(true);
-        getRepositoryNames = MethodHandles.lookup().unreflect(method);
+        MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(RepositoryManager.class, MethodHandles.lookup());
+        getRepositoryNames = lookup.unreflect(method);
       } catch (NoSuchMethodException | IllegalAccessException e) {
         throw new RuntimeException(e);
       }
@@ -76,7 +79,8 @@ public class RepositoryManagerSupport {
       try {
         Field field = RepositoryManager.class.getDeclaredField("repositoryMap");
         field.setAccessible(true);
-        getRepositoryMap = MethodHandles.lookup().unreflectGetter(field);
+        MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(RepositoryManager.class, MethodHandles.lookup());
+        getRepositoryMap = lookup.unreflectGetter(field);
       } catch (NoSuchFieldException | IllegalAccessException e) {
         throw new RuntimeException(e);
       }

@@ -15,7 +15,8 @@ public class LocalFileSystemSupport {
       try {
         Field field = LocalFileSystem.class.getDeclaredField("root");
         field.setAccessible(true);
-        getRoot = MethodHandles.lookup().unreflectGetter(field);
+        MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(LocalFileSystem.class, MethodHandles.lookup());
+        getRoot = lookup.unreflectGetter(field);
       } catch (NoSuchFieldException | IllegalAccessException e) {
         throw new RuntimeException(e);
       }

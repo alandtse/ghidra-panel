@@ -16,7 +16,8 @@ public class GhidraServerSupport {
       try {
         Field field = GhidraServer.class.getDeclaredField("server");
         field.setAccessible(true);
-        getGhidraServer = MethodHandles.lookup().unreflectGetter(field);
+        MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(GhidraServer.class, MethodHandles.lookup());
+        getGhidraServer = lookup.unreflectGetter(field);
       } catch (NoSuchFieldException | IllegalAccessException e) {
         throw new RuntimeException(e);
       }
@@ -33,7 +34,8 @@ public class GhidraServerSupport {
       try {
         Field field = GhidraServer.class.getDeclaredField("mgr");
         field.setAccessible(true);
-        getRepositoryManager = MethodHandles.lookup().unreflectGetter(field);
+        MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(GhidraServer.class, MethodHandles.lookup());
+        getRepositoryManager = lookup.unreflectGetter(field);
       } catch (NoSuchFieldException | IllegalAccessException e) {
         throw new RuntimeException(e);
       }
