@@ -43,6 +43,18 @@ endif
 test-db: init-db
 	$(BIN) set-password -db test.db -user-id 42 -user richard -pass richard
 
+# Create development database with realistic seed data for admin panel testing
+.PHONY: dev-seed
+dev-seed: init-db
+	@echo "Seeding database with test users and activity..."
+ifeq ($(OS),Windows_NT)
+	type srepanel\database\testdata\seed_admin_panel.sql | sqlite3 test.db
+else
+	sqlite3 test.db < srepanel/database/testdata/seed_admin_panel.sql
+endif
+	@echo "Database seeded! Login with admin_super/admin123"
+	@echo "Users: alice_d1a2b3, bob_c4d5e6, charlie_f7g8h9, diana_i1j2k3, eve_l4m5n6, frank_o7p8q9, grace_r1s2t3"
+
 .PHONY: jaas
 jaas:
 	$(MAKE) -C jaas build
@@ -105,6 +117,7 @@ help:
 	@echo "  make dev-config     - Run dev server with custom config (Usage: make dev-config CONFIG=myconfig.yaml)"
 	@echo "  make init-db        - Initialize test database with migrations"
 	@echo "  make test-db        - Create test database with test user"
+	@echo "  make dev-seed       - Create database with realistic seed data (for admin panel testing)"
 	@echo "  make show-providers - Show configured OAuth providers (requires grep/sed)"
 	@echo "  make integration    - Run integration tests"
 	@echo "  make clean          - Remove built binaries and test database"
