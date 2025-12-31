@@ -1,7 +1,30 @@
+# Binaries
 /srepanel/srepanel
-ghidra_panel.json
+/srepanel/srepanel.exe
+/srepanel/ghidra-panel.exe
+
+# Configuration files (keep examples)
+config.yaml
 ghidra_panel.secrets.json
-*.db*
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# Build artifacts
+/srepanel/build_*.txt
+/jaas/re/
+/jaas/bin/
+/jaas/build/
+
+# Backup files
+*~
+*.bak
+
+# Test files
+/srepanel/test_generation.go
+/test_generation.go
 
 # Common junk
 .idea/
