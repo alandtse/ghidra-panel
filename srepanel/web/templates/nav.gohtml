@@ -1,8 +1,8 @@
 <nav class="container-fluid">
   <ul>
     <li>
-      <a href="https://decomp.dev" class="contrast">
-        <strong>decomp.dev</strong>
+      <a href="/" class="contrast">
+        <strong>{{ .CommunityName }}</strong>
       </a>
     </li>
     {{ range $nav := .Nav }}
@@ -13,6 +13,9 @@
   </ul>
   {{ if .Identity }}
   <ul>
+    {{ if .SuperAdmin }}
+    <li><a href="/admin">Admin</a></li>
+    {{ end }}
     <li><a href="/logout">Logout</a></li>
   </ul>
   {{ end }}
