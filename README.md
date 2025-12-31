@@ -1,77 +1,120 @@
 # Ghidra Community Panel
 
-The Ghidra community panel assists with collaborative reverse engineering. It features:
+Self-service web panel for collaborative Ghidra reverse engineering projects.
 
-- A self-service portal to allow users to create an account and request access to repositories
-- A web interface for repository administrators to manage user access
+**Features:** OAuth login (Discord/GitHub/Google/GitLab/OIDC), pseudonymous usernames, auto-generated credentials, repository management, audit logging, IP geolocation.
 
-This repository is not an official Ghidra project.
+![Screenshots](./.github/img/home.png)
 
-![Home Page](./.github/img/home.png)
-![Repo Page](./.github/img/repo.png)
+## Quick Start
 
-## Design
+```bash
+make build jaas                    # Build panel + JAAS plugin
+cp config.example.yaml config.yaml # Configure OAuth credentials
+cd jaas && make install            # Install to Ghidra Server
+./srepanel/srepanel -config config.yaml -db panel.db
+```
 
-`ghidra-panel` introduces the following components:
+Visit `http://localhost:8080`
 
-- [SQLite database] storing hashed user credentials
-- [JAAS plugin] implementing a Ghidra authentication provider
-- [gRPC server] providing an API for the panel to interact with Ghidra
-- Web server, written in [Go]
-- Discord OAuth2 integration to authenticate users,
-  and link Ghidra usernames to Discord usernames
-  - Discord was chosen because all RE communities I've worked with use it
-  - I'm open to adding OAuth 2.0 / OpenID Connect to support other SSO providers
+## Configuration
 
-[SQLite database]: https://www.sqlite.org/index.html
-[JAAS plugin]: https://docs.oracle.com/javase/8/docs/technotes/guides/security/jaas/JAASRefGuide.html
-[gRPC server]: https://grpc.io/
-[Go]: https://go.dev/
-[Discord OAuth2]: https://discord.com/developers/docs/topics/oauth2
+**Minimal setup** - Add OAuth credentials to `config.yaml`:
+
+```yaml
+base_url: "http://localhost:8080"
+
+oauth:
+  discord:
+    enabled: true
+    client_id: "your_client_id"
+    client_secret: "your_client_secret"
+```
+
+Create OAuth app with redirect URI: `{base_url}/redirect`
+
+**Provider setup:**
+- [Discord](https://discord.com/developers/applications)
+- [GitHub](https://github.com/settings/developers) 
+- [Google](https://console.cloud.google.com/)
+- [GitLab](https://gitlab.com/-/profile/applications)
+- Any OIDC provider (see `config.example.yaml`)
+
+**Optional:**
+- `first_user_is_admin: true` - First login becomes super admin
+- `geoip_database: "GeoLite2-City.mmdb"` - IP geolocation ([setup](./GEOIP_SETUP.md))
+- `audit_log_retention_days: 365` - Log retention period
+- `community_name: "Your Team"` - Custom branding
+
+See [`config.example.yaml`](./config.example.yaml) for all options.
+
+## Ghidra Server Setup
+
+**Required:** Install JAAS plugin on Ghidra Server for authentication.
+
+```bash
+cd jaas && make build install
+```
+
+See [GHIDRA_SERVER_SETUP.md](./GHIDRA_SERVER_SETUP.md) for manual installation and troubleshooting.
+
+## User Flow
+
+1. **Login** via OAuth → Credentials auto-generated
+   - Username: `alice_8f3a2b` (pseudonymous)
+   - Password: `alpine-rocket-marble-sunset` (Diceware)
+2. **Save credentials** to password manager (export to 1Password/Bitwarden/etc.)
+3. **Connect Ghidra** → Shared Project → Use credentials
+
+**Features:**
+- Request repository access
+- Regenerate password anytime
+- Admin dashboard (stats, audit logs, user management)
+- IP geolocation tracking (optional)
+
+## Development
+
+```bash
+make dev        # Dev mode (bypasses OAuth)
+make dev-clean  # Fresh database
+make help       # Show all commands
+```
+
+**Test real OAuth:** Add credentials to `config.yaml`, run without `-dev` flag.
+
+## Architecture
 
 ```mermaid
 flowchart LR
-
-subgraph User
-    GhidraClient[Ghidra Client]
-    Browser[Web Browser]
-end
-
-subgraph GhidraServer[Ghidra Server]
-    JAASPlugin([JAAS Plugin])
-    gRPCServer([gRPC Server])
-end
-Panel[Panel Server]
-SQLite[(SQLite)]
-Discord
-
-GhidraClient --> GhidraServer
-Browser --> Panel
-Panel --> gRPCServer ~~~ SQLite
-Panel --> SQLite
-Panel --> Discord
-JAASPlugin --> SQLite
+    Browser --> Panel
+    GhidraClient --> GhidraServer
+    Panel --> GhidraServer
+    Panel --> SQLite
+    Panel --> OAuth
+    GhidraServer --> SQLite
 ```
+
+- **Panel** (Go) - Web UI, OAuth, user management
+- **JAAS Plugin** (Java) - Ghidra authentication
+- **gRPC** - Panel ↔ Ghidra communication
+- **SQLite** - Credentials, audit logs
 
 ## Philosophy
 
-This software serves a hobbyist community with limited time.
-As such, it aims to be simple, reproducible, and easy to maintain.
+Built for hobbyist communities with limited maintenance time:
+- Minimal dependencies (no external DB/IdP)
+- Battle-tested libraries (oauth2, OIDC, SQLite)
+- Server-side rendering (simple, fast)
+- Single binary deployment
 
-This rules out extensive use of external software, such as libraries,
-database servers, auth servers, etc. Any such software would require
-continuous updating.
+## Documentation
 
-This further means:
-- No fancy IdP or access controls
-  - [Keycloak](https://www.keycloak.org/) looked promising, but
-    its JAAS adapter is [deprecated](https://www.keycloak.org/docs/22.0.1/securing_apps/#keycloak-java-adapters)
-- A Go-based web server is a safe choice, as the standard library
-  contains almost everything we need
-- Web pages rendered server-side
+- [GHIDRA_SERVER_SETUP.md](./GHIDRA_SERVER_SETUP.md) - Server installation
+- [GEOIP_SETUP.md](./GEOIP_SETUP.md) - IP geolocation setup
+- [config.example.yaml](./config.example.yaml) - Full configuration reference
 
 ## Acknowledgements
 
-This panel currently powers [decomp.dev](https://decomp.dev), a shared space for GC/Wii decompilation projects.
+Powers [decomp.dev](https://decomp.dev) - GC/Wii decompilation projects.
 
-Special thank you to the [mkw.re](https://github.com/mkw-re) contributors for creating the [original project](https://github.com/mkw-re/ghidra-panel).
+Original project by [mkw.re](https://github.com/mkw-re) contributors.
