@@ -26,6 +26,7 @@ type Claims struct {
 	jwt.RegisteredClaims
 	Name       string `json:"name,omitempty"`
 	AvatarHash string `json:"avatar,omitempty"`
+	Provider   string `json:"provider,omitempty"`
 }
 
 func (iss Issuer) Issue(ident *common.Identity) (string, time.Time) {
@@ -40,6 +41,7 @@ func (iss Issuer) Issue(ident *common.Identity) (string, time.Time) {
 		},
 		Name:       ident.Username,
 		AvatarHash: ident.AvatarHash,
+		Provider:   ident.Provider,
 	})
 
 	tokenString, err := token.SignedString(iss.Secret)
@@ -73,5 +75,6 @@ func (iss Issuer) Verify(tokenString string) (ident *common.Identity, err error)
 		ID:         id,
 		Username:   claims.Name,
 		AvatarHash: claims.AvatarHash,
+		Provider:   claims.Provider,
 	}, nil
 }

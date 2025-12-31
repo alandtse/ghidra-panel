@@ -1,0 +1,86 @@
+# Ghidra Panel Configuration Example
+# Copy this file to config.yaml and customize it with your OAuth credentials
+
+# Config version - helps track format changes (current: 1)
+config_version: 1
+
+# Community/Server name (displayed in UI instead of "Ghidra Panel")
+# Examples: "decomp.dev", "MyProject RE Team", "Ghidra Community"
+community_name: "Ghidra Panel"
+
+# Base URL of your deployment (used for OAuth redirects)
+# For local development: "http://localhost:8080"
+# For production: "https://your-domain.com"
+# IMPORTANT: Make sure your OAuth app redirect URIs include: {base_url}/redirect
+base_url: "http://localhost:8080"
+
+oauth:
+  discord:
+    enabled: true
+    type: oauth2
+    client_id: "your_discord_client_id"
+    client_secret: "your_discord_client_secret"
+    auth_url: "https://discord.com/oauth2/authorize"
+    token_url: "https://discord.com/api/oauth2/token"
+    user_info_url: "https://discord.com/api/oauth2/@me"
+    scopes: ["identify"]
+    auth_style: "params"
+    user_id_field: "user.id"
+    username_field: "user.username"
+    avatar_field: "user.avatar"
+    user_id_is_string: true
+
+  github:
+    enabled: true
+    type: oauth2
+    client_id: "xxx"
+    client_secret: "xxx"
+    auth_url: "https://github.com/login/oauth/authorize"
+    token_url: "https://github.com/login/oauth/access_token"
+    user_info_url: "https://api.github.com/user"
+    scopes: ["read:user"]
+    username_field: "login"
+    avatar_field: "avatar_url"
+
+  google:
+    enabled: true
+    type: oidc
+    client_id: "xxx"
+    client_secret: "xxx"
+    issuer_url: "https://accounts.google.com"
+
+  gitlab:
+    enabled: true
+    type: oidc
+    client_id: "xxx"
+    client_secret: "xxx"
+    issuer_url: "https://gitlab.com"
+
+discord:
+  bot_token: ""
+  client_id: ""
+  client_secret: ""
+  webhook_url: ""
+
+ghidra:
+  endpoint:
+    host: "localhost"
+    port: 13100
+
+links:
+  - name: "GitHub"
+    url: "https://github.com/mkw-re/ghidra-panel"
+
+super_admins: []
+first_user_is_admin: true
+
+# Optional: Path to MaxMind GeoLite2-City database for IP geolocation
+# Shows flag emoji + city/country for IPs in audit logs on admin dashboard
+# Download from https://www.maxmind.com/en/geolite2/signup (free account)
+# See GEOIP_SETUP.md for setup instructions
+# geoip_database: "GeoLite2-City.mmdb"
+
+# Optional: Number of days to retain audit logs (default: 90)
+# Old logs are automatically cleaned up daily at midnight
+# Set to higher value for compliance requirements (e.g., 365 for 1 year)
+# audit_log_retention_days: 90
