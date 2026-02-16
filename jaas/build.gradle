@@ -20,10 +20,10 @@ plugins {
 group = 're.mkw'
 version = '1.0.0'
 
-// Compile for Java 17 (Ghidra 11.x requirement)
+// Compile for Java 21 (Ghidra 11.3+ requirement)
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 //----------------------START "DO NOT MODIFY" SECTION------------------------------
