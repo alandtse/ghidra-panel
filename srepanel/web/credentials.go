@@ -1,7 +1,6 @@
 package web
 
 import (
-	"log"
 	"net/http"
 )
 
@@ -37,8 +36,5 @@ func (s *Server) handleCredentials(wr http.ResponseWriter, req *http.Request) {
 	wr.Header().Set("Pragma", "no-cache")
 	wr.Header().Set("Expires", "0")
 
-	if err := credentialsPage.Execute(wr, state); err != nil {
-		log.Println("Failed to render credentials template:", err)
-		s.renderError(wr, http.StatusInternalServerError, "Failed to render template.", state.State)
-	}
+	s.renderTemplate(wr, req, credentialsPage, state)
 }

@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Ghidra Panel - {{ .Repo.Name }}</title>
-    {{ template "head.gohtml" }}
+    <title>Ghidra Panel - {{ .Data.Repo.Name }}</title>
+    {{ template "head.gohtml" . }}
     <style>
         .stats-grid {
             display: grid;
@@ -32,33 +32,33 @@
     </style>
 </head>
 <body>
-{{ template "nav.gohtml" . }}
+{{ template "nav.gohtml" .Data }}
 <main class="container">
-    <h1>{{ .Repo.Name }}</h1>
-    {{ template "status.gohtml" . }}
+    <h1>{{ .Data.Repo.Name }}</h1>
+    {{ template "status.gohtml" .Data }}
     
-    {{ if .Repo.Stats }}
+    {{ if .Data.Repo.Stats }}
     <article>
         <header><strong>Repository Stats</strong></header>
         <div class="stats-grid">
             <div class="stat-card">
-                <span class="stat-value">{{ .Repo.Stats.UserCount }}</span>
+                <span class="stat-value">{{ .Data.Repo.Stats.UserCount }}</span>
                 <span class="stat-label">👥 Users</span>
             </div>
             <div class="stat-card">
-                <span class="stat-value">{{ .Repo.Stats.FileCount }}</span>
+                <span class="stat-value">{{ .Data.Repo.Stats.FileCount }}</span>
                 <span class="stat-label">📁 Files</span>
             </div>
             <div class="stat-card">
-                <span class="stat-value">{{ formatDate .Repo.Stats.LastModifiedTime }}</span>
+                <span class="stat-value">{{ formatDate .Data.Repo.Stats.LastModifiedTime }}</span>
                 <span class="stat-label">📅 Last Modified</span>
             </div>
             <div class="stat-card">
-                <span class="stat-value">{{ formatSize .Repo.Stats.SizeBytes }}</span>
+                <span class="stat-value">{{ formatSize .Data.Repo.Stats.SizeBytes }}</span>
                 <span class="stat-label">💾 Size</span>
             </div>
             <div class="stat-card">
-                <span class="stat-value">{{ formatDate .Repo.Stats.CreatedTime }}</span>
+                <span class="stat-value">{{ formatDate .Data.Repo.Stats.CreatedTime }}</span>
                 <span class="stat-label">🎂 Created</span>
             </div>
         </div>
@@ -70,14 +70,15 @@
             <header>
                 <strong>Users</strong>
             </header>
-            {{ if .ACL | len  }}
+            {{ if .Data.ACL | len  }}
             <ul class="list">
-            {{ range $acl := .ACL }}
+            {{ range $acl := .Data.ACL }}
             <li>
                 <samp>{{ .User }}</samp>
                 <span style="color: {{ permColor .Perm }}">{{ permDisplay .Perm }}</span>
                 <form action="/set_user_access" method="post">
-                    <input type="hidden" name="repo" value="{{ $.Repo.Name }}">
+                    {{$.CSRFField}}
+                    <input type="hidden" name="repo" value="{{ $.Data.Repo.Name }}">
                     <input type="hidden" name="user" value="{{ .User }}">
                     <input type="hidden" name="role" value="NONE">
                     <button class="small outline secondary"><i class="fa-solid fa-xmark"></i></button>
@@ -95,12 +96,13 @@
                 <strong>Add User</strong>
             </header>
             <form action="/set_user_access" method="post">
-                <input type="hidden" name="repo" value="{{ .Repo.Name }}">
+                {{.CSRFField}}
+                <input type="hidden" name="repo" value="{{ .Data.Repo.Name }}">
                 <label for="user">Users</label>
                 <select id="user" name="user" required>
                     <option value="" disabled selected>Select a user...</option>
-                    {{ range $users := .Users }}
-                        {{ if eq $users $.QueryUser }}
+                    {{ range $users := .Data.Users }}
+                        {{ if eq $users $.Data.QueryUser }}
                             <option value="{{ $users }}" selected>{{ $users }}</option>
                         {{ else }}
                             <option value="{{ $users }}">{{ $users }}</option>
@@ -111,17 +113,17 @@
                 <div class="password_row">
                     <select id="role" name="role" required>
                         <option value="" disabled selected>Select a role...</option>
-                        {{ if eq .QueryRole "READ_ONLY" }}
+                        {{ if eq .Data.QueryRole "READ_ONLY" }}
                             <option value="READ_ONLY" selected>Read</option>
                         {{ else }}
                             <option value="READ_ONLY">Read</option>
                         {{ end }}
-                        {{ if eq .QueryRole "WRITE" }}
+                        {{ if eq .Data.QueryRole "WRITE" }}
                             <option value="WRITE" selected>Write</option>
                         {{ else }}
                             <option value="WRITE">Write</option>
                         {{ end }}
-                        {{ if eq .QueryRole "ADMIN" }}
+                        {{ if eq .Data.QueryRole "ADMIN" }}
                             <option value="ADMIN" selected>Admin</option>
                         {{ else }}
                             <option value="ADMIN">Admin</option>
@@ -136,9 +138,10 @@
                 <strong>Settings</strong>
             </header>
             <form action="/update_repo" method="post">
-                <input type="hidden" name="repo" value="{{ .Repo.Name }}">
+                {{.CSRFField}}
+                <input type="hidden" name="repo" value="{{ .Data.Repo.Name }}">
                 <label for="webhook_url">Discord Webhook URL</label>
-                {{ if .Repo.WebhookURL }}
+                {{ if .Data.Repo.WebhookURL }}
                 <input type="text" id="webhook_url" name="webhook_url" placeholder="Type DELETE to remove">
                 {{ else }}
                 <input type="text" id="webhook_url" name="webhook_url" placeholder="Not configured">
@@ -152,7 +155,8 @@
                 <strong>Delete Repository</strong>
             </header>
             <form action="/delete_repo" method="post">
-                <input type="hidden" name="repo" value="{{ .Repo.Name }}">
+                {{.CSRFField}}
+                <input type="hidden" name="repo" value="{{ .Data.Repo.Name }}">
                 <label for="confirm">Confirm</label>
                 <input type="text" id="confirm" name="confirm" placeholder="Enter repository name to confirm">
                 <button role="button" type="submit" class="outline">Delete</button>
@@ -162,6 +166,6 @@
         </div>
     </div>
 </main>
-{{ template "footer.gohtml" . }}
+{{ template "footer.gohtml" .Data }}
 </body>
 </html>

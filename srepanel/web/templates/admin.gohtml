@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <title>Admin Dashboard - Ghidra Panel</title>
-    {{ template "head.gohtml" }}
+    {{ template "head.gohtml" . }}
     <style>
         .stats-grid {
             display: grid;
@@ -46,7 +46,7 @@
     </style>
 </head>
 <body>
-{{ template "nav.gohtml" . }}
+{{ template "nav.gohtml" .Data }}
 <main class="container">
     <h1>Admin Dashboard</h1>
 
@@ -54,31 +54,31 @@
         <header><strong>📊 Panel Statistics</strong></header>
         <div class="stats-grid">
             <div class="stat-card">
-                <span class="stat-value">{{ .Stats.TotalUsers }}</span>
+                <span class="stat-value">{{ .Data.Stats.TotalUsers }}</span>
                 <span class="stat-label">👥 Total Users</span>
             </div>
             <div class="stat-card">
-                <span class="stat-value">{{ .Stats.TotalRepos }}</span>
+                <span class="stat-value">{{ .Data.Stats.TotalRepos }}</span>
                 <span class="stat-label">🗄️ Repositories</span>
             </div>
             <div class="stat-card">
-                <span class="stat-value">{{ formatSize .Stats.TotalDiskUsage }}</span>
+                <span class="stat-value">{{ formatSize .Data.Stats.TotalDiskUsage }}</span>
                 <span class="stat-label">💾 Total Disk Usage</span>
             </div>
             <div class="stat-card">
-                <span class="stat-value">{{ .Stats.ActiveSessions }}</span>
+                <span class="stat-value">{{ .Data.Stats.ActiveSessions }}</span>
                 <span class="stat-label">🔑 Active Sessions (24h)</span>
             </div>
             <div class="stat-card">
-                <span class="stat-value">{{ .Stats.FailedLogins24h }}</span>
+                <span class="stat-value">{{ .Data.Stats.FailedLogins24h }}</span>
                 <span class="stat-label">⚠️ Failed Logins (24h)</span>
             </div>
             <div class="stat-card">
-                <span class="stat-value">{{ .Stats.TotalAuditLogs }}</span>
+                <span class="stat-value">{{ .Data.Stats.TotalAuditLogs }}</span>
                 <span class="stat-label">📝 Audit Log Entries</span>
             </div>
             <div class="stat-card">
-                <span class="stat-value">{{ formatUptime .Stats.PanelUptime }}</span>
+                <span class="stat-value">{{ formatUptime .Data.Stats.PanelUptime }}</span>
                 <span class="stat-label">⏱️ Panel Uptime</span>
             </div>
         </div>
@@ -93,10 +93,10 @@
             <p>
                 Audit logs track all important actions in the panel for security and compliance.
                 Old logs are automatically cleaned up daily (configurable retention period).
-                Currently showing the {{ len .RecentActivity }} most recent events.
+                Currently showing the {{ len .Data.RecentActivity }} most recent events.
             </p>
         </details>
-        {{ if .RecentActivity | len }}
+        {{ if .Data.RecentActivity | len }}
         <figure>
             <table>
                 <thead>
@@ -110,7 +110,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {{ range $log := .RecentActivity }}
+                    {{ range $log := .Data.RecentActivity }}
                     <tr>
                         <td><small>{{ formatDate .Timestamp }}</small></td>
                         <td>{{ if .Username }}<samp>{{ .Username }}</samp>{{ else }}<em>System</em>{{ end }}</td>
@@ -139,7 +139,7 @@
         <header>
             <strong>👥 User Management</strong>
         </header>
-        {{ if .Users | len }}
+        {{ if .Data.Users | len }}
         <figure>
             <table>
                 <thead>
@@ -152,7 +152,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {{ range $user := .Users }}
+                    {{ range $user := .Data.Users }}
                     <tr>
                         <td><samp>{{ .Username }}</samp></td>
                         <td>
@@ -184,6 +184,6 @@
     </article>
 </main>
 
-{{ template "footer.gohtml" . }}
+{{ template "footer.gohtml" .Data }}
 </body>
 </html>

@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
     <title>Ghidra Panel - Error</title>
-    {{ template "head.gohtml" }}
+    {{ template "head.gohtml" . }}
 </head>
 <body>
-{{ template "nav.gohtml" . }}
+{{ template "nav.gohtml" .Data.State }}
 <main class="container">
     <h1>Error</h1>
-    <article class="alert error">{{ .Message }} Please contact server admin.</article>
+    <article class="alert error">{{ .Data.Message }} Please contact server admin.</article>
 </main>
-{{ template "footer.gohtml" . }}
+{{ template "footer.gohtml" .Data.State }}
 </body>
 </html>

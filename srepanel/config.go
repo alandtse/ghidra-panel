@@ -15,11 +15,11 @@ type OAuthProviderConfig struct {
 	// Type specifies the provider type: "oauth2" or "oidc"
 	// Default is "oidc" if issuer_url is set, "oauth2" otherwise
 	Type string `yaml:"type,omitempty"`
-	
+
 	// OIDC-specific configuration
 	// IssuerURL is used for OIDC providers (e.g., Google, GitLab)
 	IssuerURL string `yaml:"issuer_url,omitempty"`
-	
+
 	// OAuth2-specific configuration
 	// AuthURL is the authorization endpoint (e.g., "https://github.com/login/oauth/authorize")
 	AuthURL string `yaml:"auth_url,omitempty"`
@@ -31,17 +31,17 @@ type OAuthProviderConfig struct {
 	Scopes []string `yaml:"scopes,omitempty"`
 	// AuthStyle is "params" or "header" (default: "header")
 	AuthStyle string `yaml:"auth_style,omitempty"`
-	
+
 	// Field mapping for user info extraction
 	// UserIDField is the JSON field for user ID (default: "id")
 	UserIDField string `yaml:"user_id_field,omitempty"`
-	// UsernameField is the JSON field for username (default: "username")  
+	// UsernameField is the JSON field for username (default: "username")
 	UsernameField string `yaml:"username_field,omitempty"`
 	// AvatarField is the JSON field for avatar URL (optional)
 	AvatarField string `yaml:"avatar_field,omitempty"`
 	// UserIDIsString indicates if user ID is a string that needs parsing (e.g., Discord)
 	UserIDIsString bool `yaml:"user_id_is_string,omitempty"`
-	
+
 	// Display configuration
 	// DisplayName is the human-readable name shown on the login button
 	// If not set, the provider key will be capitalized (e.g., "okta" → "Okta")
@@ -64,7 +64,7 @@ type config struct {
 	} `yaml:"discord"`
 	// OAuth providers config - supports both fixed providers and dynamic OIDC providers
 	// You can add any OIDC-compliant provider by adding a new key
-	OAuth map[string]OAuthProviderConfig `yaml:"oauth"`
+	OAuth  map[string]OAuthProviderConfig `yaml:"oauth"`
 	Ghidra struct {
 		Endpoint common.GhidraEndpoint `yaml:"endpoint"`
 		GRPCAddr string                `yaml:"grpc_addr"`
@@ -73,10 +73,13 @@ type config struct {
 	SuperAdmins      []uint64      `yaml:"super_admins"`
 	FirstUserIsAdmin bool          `yaml:"first_user_is_admin"`
 	GeoIPDatabase    string        `yaml:"geoip_database"`
-	
+
 	// Optional: Number of days to retain audit logs (default: 90)
 	// Old logs are automatically cleaned up daily
 	AuditLogRetentionDays int `yaml:"audit_log_retention_days"`
+
+	// Optional: Number of days token is valid (default: 90)
+	TokenValidityDays int `yaml:"token_validity_days,omitempty"`
 }
 
 func (c *config) validate() {
@@ -89,7 +92,7 @@ func (c *config) validate() {
 		log.Printf("WARNING: Your config version is %d, but current version is %d.\n", c.ConfigVersion, currentConfigVersion)
 		log.Println("         See CONFIG_CHANGELOG.md for what's new and how to update.")
 	}
-	
+
 	if c.BaseURL == "" {
 		log.Fatal("base_url not set")
 	}
@@ -107,7 +110,7 @@ func (c *config) validate() {
 		if !provider.Enabled {
 			continue
 		}
-		
+
 		// Auto-disable providers with placeholder credentials
 		if isPlaceholder(provider.ClientID) || isPlaceholder(provider.ClientSecret) {
 			log.Printf("oauth.%s: auto-disabled (contains placeholder credentials)", name)
@@ -115,11 +118,11 @@ func (c *config) validate() {
 			c.OAuth[name] = provider
 			continue
 		}
-		
+
 		if provider.ClientID == "" || provider.ClientSecret == "" {
 			log.Fatalf("oauth.%s: client_id and client_secret must be set", name)
 		}
-		
+
 		// Determine provider type
 		providerType := provider.Type
 		if providerType == "" {
@@ -131,7 +134,7 @@ func (c *config) validate() {
 				log.Fatalf("oauth.%s: must specify either issuer_url (OIDC) or auth_url+token_url (OAuth2)", name)
 			}
 		}
-		
+
 		// Validate based on type
 		if providerType == "oidc" {
 			if provider.IssuerURL == "" {
@@ -150,7 +153,7 @@ func (c *config) validate() {
 		} else {
 			log.Fatalf("oauth.%s: unknown provider type '%s' (must be 'oauth2' or 'oidc')", name, providerType)
 		}
-		
+
 		hasProvider = true
 	}
 
@@ -170,12 +173,12 @@ func isPlaceholder(value string) bool {
 		"replace_me",
 		"example",
 	}
-	
+
 	for _, placeholder := range placeholders {
 		if strings.Contains(value, placeholder) {
 			return true
 		}
 	}
-	
+
 	return false
 }

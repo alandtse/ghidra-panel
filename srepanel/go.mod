@@ -19,6 +19,8 @@ require (
 
 require (
 	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
+	github.com/gorilla/csrf v1.7.3 // indirect
+	github.com/gorilla/securecookie v1.1.2 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/oschwald/maxminddb-golang v1.13.0 // indirect

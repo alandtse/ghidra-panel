@@ -67,7 +67,7 @@ func main() {
 	dev := flag.Bool("dev", false, "enable development mode")
 
 	flag.Parse()
-	
+
 	// Handle -clean flag
 	if *cmdClean {
 		if err := os.Remove(*dbPath); err != nil && !os.IsNotExist(err) {
@@ -138,7 +138,7 @@ func main() {
 	// Legacy Discord setup (for backwards compatibility)
 	var app *discord.Application
 	var auth *discord.Auth
-	
+
 	// Check if using legacy Discord config
 	if cfg.Discord.ClientID != "" && cfg.Discord.ClientSecret != "" {
 		app, err = discord.GetApplication(ctx, cfg.Discord.BotToken)
@@ -148,7 +148,13 @@ func main() {
 		auth = discord.NewAuth(cfg.Discord.ClientID, cfg.Discord.ClientSecret, redirectURL)
 	}
 
-	issuer := token.NewIssuer(secrets.HMACSecret)
+	// Calculate token validity
+	tokenValidity := time.Duration(cfg.TokenValidityDays) * 24 * time.Hour
+	if tokenValidity <= 0 {
+		tokenValidity = 90 * 24 * time.Hour
+	}
+
+	issuer := token.NewIssuer(secrets.HMACSecret, tokenValidity)
 
 	webConfig := web.Config{
 		CommunityName:     cfg.CommunityName,
@@ -188,7 +194,7 @@ func main() {
 		// Create provider based on type
 		var provider oauth.Provider
 		var providerErr error
-		
+
 		switch providerType {
 		case "oauth2":
 			provider = oauth.NewGenericOAuth2Provider(
@@ -254,7 +260,7 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
-	server.RegisterRoutes(mux)
+	handler := server.RegisterRoutes(mux)
 
 	// Start periodic audit log cleanup (runs daily)
 	retentionDays := cfg.AuditLogRetentionDays
@@ -262,14 +268,14 @@ func main() {
 		retentionDays = 90 // default
 	}
 	log.Printf("Audit log retention: %d days", retentionDays)
-	
+
 	go func() {
 		ticker := time.NewTicker(24 * time.Hour)
 		defer ticker.Stop()
-		
+
 		// Run cleanup immediately on startup
 		cleanupAuditLogs(db, retentionDays)
-		
+
 		for range ticker.C {
 			cleanupAuditLogs(db, retentionDays)
 		}
@@ -279,7 +285,7 @@ func main() {
 
 	httpServer := http.Server{
 		Addr:    *listen,
-		Handler: mux,
+		Handler: handler,
 	}
 	go func() {
 		err := httpServer.ListenAndServe()
@@ -302,17 +308,17 @@ func main() {
 // Since JSON is a subset of YAML, we use the YAML parser for both formats
 func loadConfig(path string) (config, error) {
 	var cfg config
-	
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return cfg, err
 	}
-	
+
 	// YAML parser handles both YAML and JSON
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return cfg, err
 	}
-	
+
 	return cfg, nil
 }
 
@@ -334,12 +340,12 @@ func updateAccount(dbPath string, userID uint64, user, pass string) {
 func cleanupAuditLogs(db *database.DB, retentionDays int) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	// Use default of 90 days if not configured
 	if retentionDays <= 0 {
 		retentionDays = 90
 	}
-	
+
 	deleted, err := db.CleanupOldAuditLogs(ctx, retentionDays)
 	if err != nil {
 		log.Printf("Warning: Failed to cleanup old audit logs: %v", err)

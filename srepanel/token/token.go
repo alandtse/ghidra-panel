@@ -12,14 +12,16 @@ import (
 
 // TODO Integrate BitRing for token expiry
 
-const jwtValidity = 90 * 24 * time.Hour
-
 type Issuer struct {
-	Secret []byte
+	Secret   []byte
+	Validity time.Duration
 }
 
-func NewIssuer(secret []byte) Issuer {
-	return Issuer{secret}
+func NewIssuer(secret []byte, validity time.Duration) Issuer {
+	if validity <= 0 {
+		validity = 90 * 24 * time.Hour
+	}
+	return Issuer{secret, validity}
 }
 
 type Claims struct {
@@ -31,7 +33,7 @@ type Claims struct {
 
 func (iss Issuer) Issue(ident *common.Identity) (string, time.Time) {
 	iat := time.Now()
-	exp := iat.Add(jwtValidity)
+	exp := iat.Add(iss.Validity)
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
 		RegisteredClaims: jwt.RegisteredClaims{

@@ -59,8 +59,7 @@ func (s *Server) logAudit(ctx context.Context, req *http.Request, action string,
 	)
 	if err != nil {
 		// Log error but don't fail the request
-		// TODO: Use proper logger
-		println("Failed to create audit log:", err.Error())
+		s.Logger.Error("Failed to create audit log", "error", err)
 	}
 }
 
@@ -77,6 +76,6 @@ func (s *Server) logAuditSimple(ctx context.Context, userID *uint64, username, a
 		Success:      success,
 	})
 	if err != nil {
-		println("Failed to create audit log:", err.Error())
+		s.Logger.Error("Failed to create audit log", "error", err)
 	}
 }

@@ -60,11 +60,7 @@ func (s *Server) handleLogin(wr http.ResponseWriter, req *http.Request) {
 			Providers: providerList,
 		}
 
-		err := loginPage.Execute(wr, loginState)
-		if err != nil {
-			log.Println("Failed to serve login:", err)
-			_, _ = wr.Write([]byte("Failed to render the login page"))
-		}
+		s.renderTemplate(wr, req, loginPage, loginState)
 	case http.MethodPost:
 		if s.Config.Dev {
 			ident := &common.Identity{
@@ -186,10 +182,10 @@ func (s *Server) handleOAuthRedirect(wr http.ResponseWriter, req *http.Request) 
 		HttpOnly: true,
 		Secure:   s.useSecureCookie,
 	})
-	
+
 	// Log successful login
 	s.logAuditSimple(req.Context(), &ident.ID, ident.Username, "login", "session", "", getClientIP(req), req.UserAgent(), true)
-	
+
 	s.redirectHome(wr, req)
 }
 
@@ -198,12 +194,12 @@ func (s *Server) checkAuth(req *http.Request) (*common.Identity, bool) {
 	if err != nil || cookie == nil {
 		return nil, false
 	}
-	
+
 	// Debug: log cookie value in dev mode
 	if s.Config.Dev {
 		log.Printf("checkAuth: cookie value length=%d, value=%q, isEmpty=%v", len(cookie.Value), cookie.Value, cookie.Value == "")
 	}
-	
+
 	// Skip verification if cookie is empty or just whitespace (was cleared)
 	if len(cookie.Value) == 0 {
 		if s.Config.Dev {
@@ -211,7 +207,7 @@ func (s *Server) checkAuth(req *http.Request) (*common.Identity, bool) {
 		}
 		return nil, false
 	}
-	
+
 	ident, err := s.Issuer.Verify(cookie.Value)
 	if err != nil {
 		// Only log errors in development mode
@@ -226,19 +222,19 @@ func (s *Server) checkAuth(req *http.Request) (*common.Identity, bool) {
 func (s *Server) handleLogout(wr http.ResponseWriter, req *http.Request) {
 	// Try to get identity before clearing cookie
 	ident, _ := s.checkAuth(req)
-	
+
 	http.SetCookie(wr, &http.Cookie{
 		Name:   "token",
 		Value:  "",
 		Path:   "/",
 		MaxAge: 0,
 	})
-	
+
 	// Log logout if we had a valid session
 	if ident != nil {
 		s.logAuditSimple(req.Context(), &ident.ID, ident.Username, "logout", "session", "", getClientIP(req), req.UserAgent(), true)
 	}
-	
+
 	s.redirectLogin(wr, req, false)
 }
 

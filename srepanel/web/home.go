@@ -1,13 +1,14 @@
 package web
 
 import (
-	"go.mkw.re/ghidra-panel/common"
-	"go.mkw.re/ghidra-panel/ghidra"
-	"google.golang.org/protobuf/types/known/emptypb"
 	"log"
 	"net/http"
 	"sort"
 	"strings"
+
+	"go.mkw.re/ghidra-panel/common"
+	"go.mkw.re/ghidra-panel/ghidra"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type HomeState struct {
@@ -31,16 +32,16 @@ func (s *Server) handleHome(wr http.ResponseWriter, req *http.Request) {
 		return
 	}
 	state.SuperAdmin = s.isSuperAdmin(req.Context(), state.Identity)
-	
+
 	// Check if admin mode is disabled via query parameter
 	adminModeParam := req.URL.Query().Get("admin_mode")
 	state.AdminModeDisabled = adminModeParam == "0"
-	
+
 	// If admin mode is disabled, treat as regular user for repository listing
 	viewAsAdmin := state.SuperAdmin && !state.AdminModeDisabled
-	
+
 	if s.Config.Dev {
-		log.Printf("Home page: User %s (ID: %d, Provider: %s) - SuperAdmin: %v, ViewAsAdmin: %v", 
+		log.Printf("Home page: User %s (ID: %d, Provider: %s) - SuperAdmin: %v, ViewAsAdmin: %v",
 			state.Identity.Username, state.Identity.ID, state.Identity.Provider, state.SuperAdmin, viewAsAdmin)
 	}
 
@@ -111,9 +112,5 @@ func (s *Server) handleHome(wr http.ResponseWriter, req *http.Request) {
 	}
 	sort.Slice(state.Repos, func(i, j int) bool { return lessCaseInsensitive(state.Repos[i], state.Repos[j]) })
 
-	err = homePage.Execute(wr, state)
-	if err != nil {
-		// Don't call renderError here - template may have already written headers
-		log.Println("Failed to serve home:", err)
-	}
+	s.renderTemplate(wr, req, homePage, state)
 }

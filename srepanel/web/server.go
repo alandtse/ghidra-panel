@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"time"
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/gorilla/csrf"
 	"github.com/oschwald/geoip2-golang"
 	"go.mkw.re/ghidra-panel/common"
 	"go.mkw.re/ghidra-panel/database"
@@ -82,9 +84,10 @@ type Server struct {
 	ProviderMetadata map[string]*common.ProviderMetadata
 	Issuer           *token.Issuer
 	Client           ghidra.GhidraClient
-	useSecureCookie  bool      // whether to set Secure flag on cookies
-	StartTime        time.Time // Panel start time for uptime tracking
+	useSecureCookie  bool           // whether to set Secure flag on cookies
+	StartTime        time.Time      // Panel start time for uptime tracking
 	GeoIPDB          *geoip2.Reader // GeoIP database for location lookups (optional)
+	Logger           *slog.Logger
 }
 
 func NewServer(
@@ -111,6 +114,7 @@ func NewServer(
 		Client:           client,
 		useSecureCookie:  useSecure,
 		StartTime:        time.Now(),
+		Logger:           slog.Default(),
 	}
 	return server, nil
 }
@@ -126,7 +130,7 @@ func (s *Server) AddProviderWithMetadata(provider oauth.Provider, metadata *comm
 	s.ProviderMetadata[provider.Name()] = metadata
 }
 
-func (s *Server) RegisterRoutes(mux *http.ServeMux) {
+func (s *Server) RegisterRoutes(mux *http.ServeMux) http.Handler {
 	mux.HandleFunc("GET /", s.handleHome)
 	mux.HandleFunc("GET /login", s.handleLogin)
 	mux.HandleFunc("POST /login", s.handleLogin)
@@ -144,8 +148,44 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /delete_repo", s.handleDeleteRepo)
 	mux.HandleFunc("GET /admin", s.handleAdmin)
 
-	// Create file server for assets
-	mux.Handle("GET /assets/", http.FileServer(http.FS(assets)))
+	// CSRF Protection
+	csrfMiddleware := csrf.Protect(
+		s.Issuer.Secret,
+		csrf.Secure(s.useSecureCookie),
+		csrf.Path("/"),
+	)
+
+	// Combine middlewares
+	handler := s.securityMiddleware(csrfMiddleware(mux))
+
+	// Create file server for assets (exempt from CSRF but needs security headers)
+	// Note: We apply security headers to assets too just to be safe/consistent
+	assetHandler := s.securityMiddleware(http.StripPrefix("/assets/", http.FileServer(http.FS(assets))))
+	mux.Handle("GET /assets/", assetHandler)
+
+	return handler
+}
+
+func (s *Server) renderTemplate(wr http.ResponseWriter, req *http.Request, tmpl *template.Template, data interface{}) {
+	// Inject CSRF token into data if it's a map or struct
+	// This is a simplified approach; in production you'd use a base context struct
+
+	// For now, we'll use a wrapper struct that includes CSRF data
+	type TemplateData struct {
+		Data      interface{}
+		CSRFField template.HTML
+		CSRFToken string
+	}
+
+	tmplData := TemplateData{
+		Data:      data,
+		CSRFField: csrf.TemplateField(req),
+		CSRFToken: csrf.Token(req),
+	}
+
+	if err := tmpl.Execute(wr, tmplData); err != nil {
+		s.Logger.Error("Failed to render template", "error", err)
+	}
 }
 
 // State holds server-side web page state.
@@ -171,11 +211,11 @@ func (s *Server) stateWithNav(req *http.Request, nav ...Nav) *State {
 	// Check Ghidra server status
 	ghidraOnline := false
 	ghidraVersion := ""
-	
+
 	if s.Config.Dev {
 		log.Printf("Checking Ghidra server at %s:%d", s.Config.GhidraEndpoint.Hostname, s.Config.GhidraEndpoint.Port)
 	}
-	
+
 	reply, err := s.Client.GetRepositories(req.Context(), &emptypb.Empty{})
 	if err != nil {
 		if s.Config.Dev {
@@ -188,7 +228,7 @@ func (s *Server) stateWithNav(req *http.Request, nav ...Nav) *State {
 			log.Printf("Ghidra server online: version %s", ghidraVersion)
 		}
 	}
-	
+
 	communityName := s.Config.CommunityName
 	if communityName == "" {
 		communityName = "Ghidra Panel"
@@ -230,17 +270,17 @@ func (s *Server) authenticateState(wr http.ResponseWriter, req *http.Request, st
 			}
 		}
 	}
-	
+
 	state.Identity = ident
 
 	userState, err := s.DB.GetUserState(req.Context(), ident)
 	if err != nil {
 		log.Println("Failed to get user state:", err)
-		s.renderError(wr, http.StatusInternalServerError, "Failed to get user state.", state)
+		s.renderError(wr, req, http.StatusInternalServerError, "Failed to get user state.", state)
 		return false
 	}
 	state.UserState = userState
-	
+
 	// Set SuperAdmin flag
 	state.SuperAdmin = s.isSuperAdmin(req.Context(), ident)
 

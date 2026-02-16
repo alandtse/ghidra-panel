@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <title>Ghidra Panel - Home</title>
-  {{ template "head.gohtml" }}
+  {{ template "head.gohtml" . }}
   <style>
     .role-checkboxes {
       display: inline-flex;
@@ -29,38 +29,38 @@
   </style>
 </head>
 <body>
-{{ template "nav.gohtml" . }}
+{{ template "nav.gohtml" .Data }}
 <main class="container">
-  <h1>Hi, {{ .Identity.Username }}!</h1>
-  {{ template "status.gohtml" . }}
+  <h1>Hi, {{ .Data.Identity.Username }}!</h1>
+  {{ template "status.gohtml" .Data }}
   
-  {{ if .SuperAdmin }}
+  {{ if .Data.SuperAdmin }}
   <article style="border-left: 4px solid {{ permColor 2 }}; background: rgba(76, 175, 80, 0.05);">
     <header>
       <strong>🔑 Panel Super Admin</strong>
     </header>
     <p>You have super admin privileges and can manage all repositories and users.</p>
-    {{ if .GhidraOnline }}
+    {{ if .Data.GhidraOnline }}
     <p><small>✓ Ghidra server is online — You can manage all repositories below</small></p>
     {{ else }}
     <p><small>⚠ Ghidra server is offline — Repository management will be available when the server is online</small></p>
     {{ end }}
     <div class="admin-toggle">
       <label>
-        <input type="checkbox" id="adminModeToggle" onchange="toggleAdminMode(this.checked)" {{ if not .AdminModeDisabled }}checked{{ end }}>
+        <input type="checkbox" id="adminModeToggle" onchange="toggleAdminMode(this.checked)" {{ if not .Data.AdminModeDisabled }}checked{{ end }}>
         View as Admin (show all repositories and management options)
       </label>
     </div>
   </article>
   {{ end }}
   
-  {{ if .SuperAdmin }}
+  {{ if .Data.SuperAdmin }}
   <article>
     <header>
       <strong>Repository Access</strong>
       <small style="color: {{ permColor 2 }}">(Admin access to all repos)</small>
     </header>
-    {{ if .ACL | len  }}
+    {{ if .Data.ACL | len  }}
     <figure>
       <table>
         <thead>
@@ -74,7 +74,7 @@
           </tr>
         </thead>
         <tbody>
-          {{ range $acl := .ACL }}
+          {{ range $acl := .Data.ACL }}
           <tr>
             <td>
               {{ if .IsAdmin }}
@@ -105,15 +105,15 @@
   </article>
   {{ end }}
 
-  {{ if not .SuperAdmin }}
+  {{ if not .Data.SuperAdmin }}
   <div class="grid">
   <article>
     <header>
       <strong>Repository Access</strong>
     </header>
-    {{ if .ACL | len  }}
+    {{ if .Data.ACL | len  }}
     <ul class="list">
-      {{ range $repo := .ACL }}
+      {{ range $repo := .Data.ACL }}
       <li>
         {{ if .IsAdmin }}
         <a href="/repos/{{ .Repo }}"><samp>{{ .Repo }}</samp></a>
@@ -143,15 +143,16 @@
   </article>
   
   <article>
-    {{ if .UserState.HasPassword }}
+    {{ if .Data.UserState.HasPassword }}
     <header>
       <strong>Request Access</strong>
     </header>
     <form action="/request_access" method="post">
+      {{.CSRFField}}
       <label for="repo">Repository</label>
       <select id="repo" name="repo" required>
         <option value="" disabled selected>Select a repository...</option>
-        {{ range $repo := .Repos }}
+        {{ range $repo := .Data.Repos }}
         <option value="{{ $repo }}">{{ $repo }}</option>
         {{ end }}
       </select>
@@ -166,18 +167,19 @@
         <button role="button" type="submit" class="outline">Request</button>
       </div>
     </form>
-    {{ else if not .UserState.HasPassword }}
+    {{ else if not .Data.UserState.HasPassword }}
     <header>
       <strong>Welcome!</strong>
     </header>
     <p>Create your Ghidra account to start collaborating. A secure username and passphrase will be automatically generated for you.</p>
     <form action="/create_account" method="post">
+      {{.CSRFField}}
       <button role="button" type="submit">
         <i class="fa fa-user-plus"></i> Create Ghidra Account
       </button>
     </form>
     <small>
-      <i class="fa fa-shield-alt"></i> Your account will be securely linked to your <strong>{{ .Identity.Provider }}</strong> profile for accountability.
+      <i class="fa fa-shield-alt"></i> Your account will be securely linked to your <strong>{{ .Data.Identity.Provider }}</strong> profile for accountability.
     </small>
     {{ else }}
     <header>
@@ -186,22 +188,23 @@
     <div class="grid">
       <label>
         Hostname
-        <input type="text" value="{{ .Ghidra.Hostname }}" readonly>
+        <input type="text" value="{{ .Data.Ghidra.Hostname }}" readonly>
       </label>
       <label>
         Port
-        <input type="text" value="{{ .Ghidra.Port }}" readonly>
+        <input type="text" value="{{ .Data.Ghidra.Port }}" readonly>
       </label>
     </div>
-    <small>Server version: {{ .GhidraVersion }}</small>
+    <small>Server version: {{ .Data.GhidraVersion }}</small>
 
     <label>Username</label>
-    <input type="text" value="{{ .UserState.Username }}" readonly>
+    <input type="text" value="{{ .Data.UserState.Username }}" readonly>
     <small>
-      <i class="fa fa-lock"></i> Your username is linked to your <strong>{{ .Identity.Provider }}</strong> account and cannot be changed.
+      <i class="fa fa-lock"></i> Your username is linked to your <strong>{{ .Data.Identity.Provider }}</strong> account and cannot be changed.
     </small>
 
     <form action="/update_account" method="post">
+      {{.CSRFField}}
       <label>Password</label>
       <button role="button" type="submit" class="outline">
         <i class="fa fa-sync-alt"></i> Get New Password
@@ -216,7 +219,7 @@
   </div>
   {{ end }}
 
-  {{ if .UserState.HasPassword }}
+  {{ if .Data.UserState.HasPassword }}
   <div class="grid">
     <article>
       <header>
@@ -225,19 +228,19 @@
       <div class="grid">
         <label>
           Hostname
-          <input type="text" value="{{ .Ghidra.Hostname }}" readonly>
+          <input type="text" value="{{ .Data.Ghidra.Hostname }}" readonly>
         </label>
         <label>
           Port
-          <input type="text" value="{{ .Ghidra.Port }}" readonly>
+          <input type="text" value="{{ .Data.Ghidra.Port }}" readonly>
         </label>
       </div>
-      <small>Server version: {{ .GhidraVersion }}</small>
+      <small>Server version: {{ .Data.GhidraVersion }}</small>
 
       <label>Username</label>
-      <input type="text" value="{{ .UserState.Username }}" readonly>
+      <input type="text" value="{{ .Data.UserState.Username }}" readonly>
       <small>
-        <i class="fa fa-lock"></i> Your username is linked to your <strong>{{ .Identity.Provider }}</strong> account and cannot be changed.
+        <i class="fa fa-lock"></i> Your username is linked to your <strong>{{ .Data.Identity.Provider }}</strong> account and cannot be changed.
       </small>
     </article>
 
@@ -282,6 +285,6 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
-{{ template "footer.gohtml" . }}
+{{ template "footer.gohtml" .Data }}
 </body>
 </html>

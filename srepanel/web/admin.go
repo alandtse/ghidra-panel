@@ -30,13 +30,13 @@ type AuditLogWithLocation struct {
 }
 
 type PanelStats struct {
-	TotalUsers       int
-	TotalRepos       int
-	TotalDiskUsage   int64
-	ActiveSessions   int
-	FailedLogins24h  int
-	TotalAuditLogs   int
-	PanelUptime      time.Duration
+	TotalUsers      int
+	TotalRepos      int
+	TotalDiskUsage  int64
+	ActiveSessions  int
+	FailedLogins24h int
+	TotalAuditLogs  int
+	PanelUptime     time.Duration
 }
 
 type UserSummary struct {
@@ -57,12 +57,12 @@ var providerProfileURLs = map[string]string{
 }
 
 // getProviderProfileURL generates a profile URL based on provider type
-func getProviderProfileURL(provider string, userID uint64, username string) string{
+func getProviderProfileURL(provider string, userID uint64, username string) string {
 	template, ok := providerProfileURLs[provider]
 	if !ok || template == "" {
 		return ""
 	}
-	
+
 	switch provider {
 	case "discord":
 		return fmt.Sprintf(template, userID)
@@ -103,7 +103,7 @@ func (s *Server) handleAdmin(wr http.ResponseWriter, req *http.Request) {
 	stats, err := s.getPanelStats(req)
 	if err != nil {
 		log.Println("Failed to get panel stats:", err)
-		s.renderError(wr, http.StatusInternalServerError, "Failed to load statistics.", state.State)
+		s.renderError(wr, req, http.StatusInternalServerError, "Failed to load statistics.", state.State)
 		return
 	}
 	state.Stats = stats
@@ -112,10 +112,10 @@ func (s *Server) handleAdmin(wr http.ResponseWriter, req *http.Request) {
 	activity, err := s.getRecentActivity(req, 50, state.FilterAction, state.FilterUser)
 	if err != nil {
 		log.Println("Failed to get recent activity:", err)
-		s.renderError(wr, http.StatusInternalServerError, "Failed to load activity.", state.State)
+		s.renderError(wr, req, http.StatusInternalServerError, "Failed to load activity.", state.State)
 		return
 	}
-	
+
 	// Add GeoIP lookups to activity
 	activityWithLocation := make([]*AuditLogWithLocation, len(activity))
 	for i, log := range activity {
@@ -130,16 +130,12 @@ func (s *Server) handleAdmin(wr http.ResponseWriter, req *http.Request) {
 	users, err := s.getUserSummaries(req)
 	if err != nil {
 		log.Println("Failed to get user summaries:", err)
-		s.renderError(wr, http.StatusInternalServerError, "Failed to load users.", state.State)
+		s.renderError(wr, req, http.StatusInternalServerError, "Failed to load users.", state.State)
 		return
 	}
 	state.Users = users
 
-	err = adminPage.Execute(wr, state)
-	if err != nil {
-		log.Println("Failed to render admin page:", err)
-		s.renderError(wr, http.StatusInternalServerError, "Failed to render page.", state.State)
-	}
+	s.renderTemplate(wr, req, adminPage, state)
 }
 
 func (s *Server) getPanelStats(req *http.Request) (*PanelStats, error) {
@@ -226,7 +222,7 @@ func (s *Server) getUserSummaries(req *http.Request) ([]*UserSummary, error) {
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// Generate profile URL based on provider
 		user.ProfileURL = getProviderProfileURL(user.Provider, user.UserID, oauthUsername)
 

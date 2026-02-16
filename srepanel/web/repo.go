@@ -1,12 +1,13 @@
 package web
 
 import (
-	"go.mkw.re/ghidra-panel/common"
-	"go.mkw.re/ghidra-panel/ghidra"
-	"google.golang.org/protobuf/types/known/emptypb"
 	"log"
 	"net/http"
 	"sort"
+
+	"go.mkw.re/ghidra-panel/common"
+	"go.mkw.re/ghidra-panel/ghidra"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type RepoState struct {
@@ -42,7 +43,7 @@ func (s *Server) handleRepo(wr http.ResponseWriter, req *http.Request) {
 	info, err := s.DB.GetRepository(req.Context(), repoName)
 	if err != nil {
 		log.Println("Failed to fetch repository:", err)
-		s.renderError(wr, http.StatusInternalServerError, "Failed to fetch repository.", state.State)
+		s.renderError(wr, req, http.StatusInternalServerError, "Failed to fetch repository.", state.State)
 		return
 	}
 	state.Repo = info
@@ -51,7 +52,7 @@ func (s *Server) handleRepo(wr http.ResponseWriter, req *http.Request) {
 	reply, err := s.Client.GetRepositories(req.Context(), &emptypb.Empty{})
 	if err != nil {
 		log.Print("Failed to fetch repositories:", err)
-		s.renderError(wr, http.StatusInternalServerError, "Failed to fetch repositories.", state.State)
+		s.renderError(wr, req, http.StatusInternalServerError, "Failed to fetch repositories.", state.State)
 		return
 	}
 
@@ -114,9 +115,5 @@ func (s *Server) handleRepo(wr http.ResponseWriter, req *http.Request) {
 	}
 	sort.Slice(state.Users, func(i, j int) bool { return lessCaseInsensitive(state.Users[i], state.Users[j]) })
 
-	err = repoPage.Execute(wr, state)
-	if err != nil {
-		log.Println("Failed to serve repo:", err)
-		s.renderError(wr, http.StatusInternalServerError, "Failed to render page.", state.State)
-	}
+	s.renderTemplate(wr, req, repoPage, state)
 }
