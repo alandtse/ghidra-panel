@@ -126,18 +126,30 @@ public class PanelLoginModule implements LoginModule {
     }
   }
 
+  private static Connection sharedConnection;
+
   /**
    * Acquires a JDBC connection handle to the URI in options.
    *
    * @throws SQLException Failed to connect to database.
    */
-  private Connection connectToDatabase() throws SQLException {
-    // TODO consider caching connection handles
+  private synchronized Connection connectToDatabase() throws SQLException {
+    try {
+      if (sharedConnection != null && !sharedConnection.isClosed() && sharedConnection.isValid(1)) {
+        return sharedConnection;
+      }
+    } catch (SQLException e) {
+      log.warn("Failed to check validity of shared connection, discarding it", e);
+    }
+
     String jdbc = options.getOrDefault(JDBC_OPTION_NAME, "").toString();
     if (jdbc.isEmpty()) {
       throw new SQLException("JDBC connection string not provided");
     }
-    return DriverManager.getConnection(jdbc);
+
+    log.info("Creating new database connection to: {}", jdbc);
+    sharedConnection = DriverManager.getConnection(jdbc);
+    return sharedConnection;
   }
 
   /**
@@ -247,10 +259,11 @@ public class PanelLoginModule implements LoginModule {
         }
       }
       if (dbConn != null) {
-        try {
-          dbConn.close();
-        } catch (SQLException ignored) {
-        }
+        // Do not close shared connection
+        // try {
+        //   dbConn.close();
+        // } catch (SQLException ignored) {
+        // }
       }
     }
   }
