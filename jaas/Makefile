@@ -9,6 +9,13 @@ else
 	$(GRADLE) jar
 endif
 
+install: build
+ifndef GHIDRA_SERVER_DIR
+	$(error GHIDRA_SERVER_DIR is not defined)
+endif
+	cp build/libs/ghidra-panel-jaas.jar $(GHIDRA_SERVER_DIR)/ghidra-panel-jaas.jar
+	@echo "Installed JAR to $(GHIDRA_SERVER_DIR)/ghidra-panel-jaas.jar"
+
 ../test.db:
 	$(MAKE) -C .. test.db
 
