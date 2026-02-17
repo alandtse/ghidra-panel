@@ -52,11 +52,8 @@ func (s *Server) handleHome(wr http.ResponseWriter, req *http.Request) {
 		log.Println("Warning: Failed to fetch repositories (Ghidra server may be offline):", err)
 		state.GhidraVersion = "Unavailable (Ghidra server offline)"
 		// Render home page with empty repository list
-		err = homePage.Execute(wr, state)
-		if err != nil {
-			// Don't call renderError here - template may have already written headers
-			log.Println("Failed to serve home:", err)
-		}
+		// Render home page with empty repository list
+		s.renderTemplate(wr, req, homePage, state)
 		return
 	}
 
