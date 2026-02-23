@@ -1,13 +1,10 @@
 package web
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
-	"strconv"
 
 	"go.mkw.re/ghidra-panel/ghidra"
 	"go.mkw.re/ghidra-panel/passphrase"
@@ -26,21 +23,25 @@ func (s *Server) handleCreateAccount(wr http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	// Auto-generate pseudonymous username
-	user := username.GeneratePseudonymous(ident.Provider, ident.Username, strconv.FormatUint(ident.ID, 10))
+	// Try to use the exact sanitized OAuth username first
+	baseUser := username.Sanitize(ident.Username)
+	user := baseUser
 
-	// Check for collision (extremely rare with SHA-256)
-	exists, err := s.DB.UsernameExists(req.Context(), user)
-	if err != nil {
-		log.Println("Failed to check if username exists:", err)
-		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
-		return
-	}
-	if exists {
-		// Add random suffix in the extremely rare case of collision
-		suffix := make([]byte, 2)
-		rand.Read(suffix)
-		user = user + "_" + hex.EncodeToString(suffix)
+	// Check for collision and append incremental numeric suffix if needed
+	for i := 0; i < 100; i++ { // limit to 100 attempts to prevent infinite loops
+		exists, err := s.DB.UsernameExists(req.Context(), user)
+		if err != nil {
+			log.Println("Failed to check if username exists:", err)
+			http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
+			return
+		}
+
+		if !exists {
+			break // Found a unique username
+		}
+
+		// Collision occurred, append a suffix (e.g., baseUser_1)
+		user = fmt.Sprintf("%s_%d", baseUser, i+1)
 	}
 
 	// Auto-generate secure passphrase

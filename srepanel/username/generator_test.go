@@ -151,9 +151,9 @@ func TestSanitizeUsername(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			result := sanitizeUsername(tt.input)
+			result := Sanitize(tt.input)
 			if result != tt.expected {
-				t.Errorf("sanitizeUsername(%q) = %q, want %q", tt.input, result, tt.expected)
+				t.Errorf("Sanitize(%q) = %q, want %q", tt.input, result, tt.expected)
 			}
 		})
 	}
@@ -172,27 +172,27 @@ func TestSanitizeUsername_AlwaysValid(t *testing.T) {
 
 	for _, input := range inputs {
 		t.Run(input, func(t *testing.T) {
-			result := sanitizeUsername(input)
+			result := Sanitize(input)
 
 			// Must not be empty
 			if result == "" {
-				t.Errorf("sanitizeUsername(%q) returned empty string", input)
+				t.Errorf("Sanitize(%q) returned empty string", input)
 			}
 
 			// Must start with letter
 			if result[0] < 'a' || result[0] > 'z' {
-				t.Errorf("sanitizeUsername(%q) = %q, must start with letter", input, result)
+				t.Errorf("Sanitize(%q) = %q, must start with letter", input, result)
 			}
 
 			// Must not exceed 16 chars
 			if len(result) > 16 {
-				t.Errorf("sanitizeUsername(%q) = %q, exceeds 16 characters", input, result)
+				t.Errorf("Sanitize(%q) = %q, exceeds 16 characters", input, result)
 			}
 
 			// Must only contain valid characters
 			for _, c := range result {
 				if !((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_') {
-					t.Errorf("sanitizeUsername(%q) = %q, contains invalid character %q", input, result, c)
+					t.Errorf("Sanitize(%q) = %q, contains invalid character %q", input, result, c)
 				}
 			}
 		})
