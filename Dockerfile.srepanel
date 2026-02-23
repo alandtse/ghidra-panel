@@ -1,0 +1,27 @@
+# Stage 1: Build the Go binary
+FROM golang:1.24 AS builder
+
+WORKDIR /app
+COPY srepanel/go.mod srepanel/go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+
+COPY srepanel/ ./
+# Enable CGO for SQLite
+ENV CGO_ENABLED=1 
+ENV GOOS=linux
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go build -o srepanel .
+
+# Stage 2: Final Image
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y ca-certificates sqlite3 && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=builder /app/srepanel /app/srepanel
+
+EXPOSE 8080
+
+CMD ["/app/srepanel", "-config", "/data/config.yaml", "-secrets", "/data/ghidra_panel.secrets.json", "-db", "/data/ghidra_panel.db"]

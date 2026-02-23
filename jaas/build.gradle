@@ -50,11 +50,11 @@ def protobufVersion = '3.25.1'
 def protocVersion = protobufVersion
 
 dependencies {
-    // Ghidra
-    compileOnly fileTree(dir: ghidraDir + '/Framework', include: '**/*.jar')
-    compileOnly fileTree(dir: ghidraDir + '/Features', include: '**/*.jar')
-    compileOnly fileTree(dir: ghidraDir + '/Debug', include: '**/*.jar')
-    compileOnly fileTree(dir: ghidraDir + '/Processors', include: '**/*.jar')
+    // Ghidra (excluding its bundled Protobuf to avoid classpath pollution during compilation)
+    compileOnly fileTree(dir: ghidraDir + '/Framework', include: '**/*.jar', exclude: '**/protobuf*.jar')
+    compileOnly fileTree(dir: ghidraDir + '/Features', include: '**/*.jar', exclude: '**/protobuf*.jar')
+    compileOnly fileTree(dir: ghidraDir + '/Debug', include: '**/*.jar', exclude: '**/protobuf*.jar')
+    compileOnly fileTree(dir: ghidraDir + '/Processors', include: '**/*.jar', exclude: '**/protobuf*.jar')
 
     // JDBC
     runtimeOnly 'org.xerial:sqlite-jdbc:3.42.0.0'

@@ -1,0 +1,10 @@
+.git
+.github
+.gradle_home
+.idea
+.vscode
+go.work
+go.work.sum
+srepanel/srepanel
+srepanel/test.db
+srepanel/test.db-*

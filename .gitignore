@@ -36,3 +36,4 @@ coverage
 .idea/
 .vscode/
 .DS_Store
+.gradle_home

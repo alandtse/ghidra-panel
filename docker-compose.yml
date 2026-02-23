@@ -1,0 +1,35 @@
+
+services:
+  ghidra:
+    build:
+      context: .
+      dockerfile: Dockerfile.ghidra
+      args:
+        GHIDRA_ZIP_URL: "https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_12.0.3_build/ghidra_12.0.3_PUBLIC_20260210.zip"
+    ports:
+      - "13100:13100"
+      - "13101:13101"
+      - "13102:13102"
+    volumes:
+      - ghidra_repos:/repos
+      - panel_data:/data
+    environment:
+      - GHIDRA_PUBLIC_HOSTNAME=127.0.0.1
+    restart: unless-stopped
+    depends_on:
+      - panel
+
+  panel:
+    build:
+      context: .
+      dockerfile: Dockerfile.srepanel
+    ports:
+      - "8080:8080"
+    volumes:
+      - panel_data:/data
+      - ./config.yaml:/data/config.yaml
+    restart: unless-stopped
+
+volumes:
+  ghidra_repos:
+  panel_data:

@@ -1,0 +1,67 @@
+ARG GHIDRA_ZIP_URL
+
+# Stage 1: Build the plugin
+FROM eclipse-temurin:21-jdk AS builder
+
+ARG GHIDRA_ZIP_URL
+
+RUN apt-get update && apt-get install -y wget unzip
+WORKDIR /app
+RUN wget -qO ghidra.zip ${GHIDRA_ZIP_URL} && \
+    unzip -q ghidra.zip && \
+    mv ghidra_* /ghidra && \
+    rm ghidra.zip
+
+COPY jaas/ ./jaas/
+WORKDIR /app/jaas
+ENV GHIDRA_INSTALL_DIR=/ghidra
+RUN ./gradlew clean jar
+
+# Stage 2: Final Ghidra Server Image
+FROM eclipse-temurin:21-jdk
+
+ARG GHIDRA_ZIP_URL
+
+RUN apt-get update && apt-get install -y wget unzip tzdata && \
+    wget -qO ghidra.zip ${GHIDRA_ZIP_URL} && \
+    unzip -q ghidra.zip && \
+    mv ghidra_* /ghidra && \
+    rm ghidra.zip && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Copy built JAAS plugin
+COPY --from=builder /app/jaas/build/libs/ghidra-panel-jaas.jar /ghidra/server/ghidra-panel-jaas.jar
+
+WORKDIR /ghidra/server
+
+# Setup Jaas config
+RUN echo "auth {\n\
+    re.mkw.srejaas.PanelLoginModule REQUIRED\n\
+    JDBC=\"jdbc:sqlite:/data/ghidra_panel.db\"\n\
+    ;\n\
+    };" > jaas.conf
+
+# Patch server.conf for PanelServer
+RUN cp server.conf server.conf.bak && \
+    sed -i 's/^wrapper.java.app.mainclass=ghidra.server.remote.GhidraServer/#wrapper.java.app.mainclass=ghidra.server.remote.GhidraServer/' server.conf && \
+    sed -i 's/^wrapper.app.parameter.1=-a0/#wrapper.app.parameter.1=-a0/' server.conf && \
+    sed -i 's/^wrapper.app.parameter.2=\${ghidra.repositories.dir}/#wrapper.app.parameter.2=${ghidra.repositories.dir}/' server.conf && \
+    echo "" >> server.conf && \
+    echo "# Ghidra Panel Configuration" >> server.conf && \
+    echo "wrapper.java.app.mainclass=re.mkw.srejaas.PanelServer" >> server.conf && \
+    echo "wrapper.java.classpath.Panel=/ghidra/server/ghidra-panel-jaas.jar" >> server.conf && \
+    echo "wrapper.app.parameter.1=-a4" >> server.conf && \
+    echo "wrapper.app.parameter.2=-jaas" >> server.conf && \
+    echo "wrapper.app.parameter.3=jaas.conf" >> server.conf && \
+    echo "wrapper.app.parameter.4=-grpc-port" >> server.conf && \
+    echo "wrapper.app.parameter.5=13103" >> server.conf && \
+    echo "wrapper.app.parameter.6=-ip" >> server.conf && \
+    echo "wrapper.app.parameter.7=GHIDRA_PUBLIC_HOSTNAME_PLACEHOLDER" >> server.conf && \
+    echo "wrapper.app.parameter.8=/repos" >> server.conf && \
+    echo "wrapper.java.additional.10=--add-opens=java.base/java.lang.invoke=ALL-UNNAMED" >> server.conf
+
+ENV GHIDRA_PUBLIC_HOSTNAME=127.0.0.1
+
+EXPOSE 13100 13101 13102 13103
+
+CMD sed -i "s/GHIDRA_PUBLIC_HOSTNAME_PLACEHOLDER/$GHIDRA_PUBLIC_HOSTNAME/g" server.conf && ./ghidraSvr console
