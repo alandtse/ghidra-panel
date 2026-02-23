@@ -149,10 +149,16 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) http.Handler {
 	mux.HandleFunc("GET /admin", s.handleAdmin)
 
 	// CSRF Protection
+	var trustedOrigins []string
+	if baseURL, err := url.Parse(s.Config.BaseURL); err == nil && baseURL.Host != "" {
+		trustedOrigins = append(trustedOrigins, baseURL.Host)
+	}
+
 	csrfMiddleware := csrf.Protect(
 		s.Issuer.Secret,
 		csrf.Secure(s.useSecureCookie),
 		csrf.Path("/"),
+		csrf.TrustedOrigins(trustedOrigins),
 	)
 
 	// Combine middlewares
