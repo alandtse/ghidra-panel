@@ -45,12 +45,6 @@
     {{ else }}
     <p><small>⚠ Ghidra server is offline — Repository management will be available when the server is online</small></p>
     {{ end }}
-    <div class="admin-toggle">
-      <label>
-        <input type="checkbox" id="adminModeToggle" onchange="toggleAdminMode(this.checked)" {{ if not .Data.AdminModeDisabled }}checked{{ end }}>
-        View as Admin (show all repositories and management options)
-      </label>
-    </div>
   </article>
   {{ end }}
   
@@ -167,60 +161,18 @@
         <button role="button" type="submit" class="outline">Request</button>
       </div>
     </form>
-    {{ else if not .Data.UserState.HasPassword }}
-    <header>
-      <strong>Welcome!</strong>
-    </header>
-    <p>Create your Ghidra account to start collaborating. A secure username and passphrase will be automatically generated for you.</p>
-    <form action="/create_account" method="post">
-      {{.CSRFField}}
-      <button role="button" type="submit">
-        <i class="fa fa-user-plus"></i> Create Ghidra Account
-      </button>
-    </form>
-    <small>
-      <i class="fa fa-shield-alt"></i> Your account will be securely linked to your <strong>{{ .Data.Identity.Provider }}</strong> profile for accountability.
-    </small>
     {{ else }}
     <header>
-      <strong>Connection Information</strong>
+      <strong>Request Access</strong>
     </header>
-    <div class="grid">
-      <label>
-        Hostname
-        <input type="text" value="{{ .Data.Ghidra.Hostname }}" readonly>
-      </label>
-      <label>
-        Port
-        <input type="text" value="{{ .Data.Ghidra.Port }}" readonly>
-      </label>
-    </div>
-    <small>Server version: {{ .Data.GhidraVersion }}</small>
-
-    <label>Username</label>
-    <input type="text" value="{{ .Data.UserState.Username }}" readonly>
-    <small>
-      <i class="fa fa-lock"></i> Your username is linked to your <strong>{{ .Data.Identity.Provider }}</strong> account and cannot be changed.
-    </small>
-
-    <form action="/update_account" method="post">
-      {{.CSRFField}}
-      <label>Password</label>
-      <button role="button" type="submit" class="outline">
-        <i class="fa fa-sync-alt"></i> Get New Password
-      </button>
-      <small>
-        <i class="fa fa-info-circle"></i> Click to generate a new password anytime you need to see it (e.g., to login to Ghidra).
-        <br><strong>Tip:</strong> Save the password to your password manager after generating.
-      </small>
-    </form>
+    <p>You need to create a Ghidra account before you can request access to repositories.</p>
     {{ end }}
   </article>
   </div>
   {{ end }}
 
-  {{ if .Data.UserState.HasPassword }}
   <div class="grid">
+    {{ if and .Data.UserState .Data.UserState.HasPassword }}
     <article>
       <header>
         <strong>Connection Information</strong>
@@ -249,6 +201,7 @@
         <strong>Password Management</strong>
       </header>
       <form action="/update_account" method="post">
+        {{.CSRFField}}
         <label>Password</label>
         <button role="button" type="submit" class="outline">
           <i class="fa fa-sync-alt"></i> Get New Password
@@ -259,31 +212,27 @@
         </small>
       </form>
     </article>
+    {{ else }}
+    <article>
+      <header>
+        <strong>Welcome!</strong>
+      </header>
+      <p>Create your Ghidra account to start collaborating. A secure username and passphrase will be automatically generated for you.</p>
+      <form action="/create_account" method="post">
+        {{.CSRFField}}
+        <button role="button" type="submit">
+          <i class="fa fa-user-plus"></i> Create Ghidra Account
+        </button>
+      </form>
+      <small>
+        <i class="fa fa-shield-alt"></i> Your account will be securely linked to your <strong>{{ .Data.Identity.Provider }}</strong> profile for accountability.
+      </small>
+    </article>
+    {{ end }}
   </div>
-  {{ end }}
 </main>
 
-<script>
-function toggleAdminMode(enabled) {
-  // Store preference in sessionStorage
-  sessionStorage.setItem('adminMode', enabled ? 'true' : 'false');
-  
-  // Reload page to apply the filter
-  window.location.href = '/?admin_mode=' + (enabled ? '1' : '0');
-}
 
-// Restore admin mode toggle state on page load
-document.addEventListener('DOMContentLoaded', function() {
-  const toggle = document.getElementById('adminModeToggle');
-  if (toggle) {
-    const urlParams = new URLSearchParams(window.location.search);
-    const adminMode = urlParams.get('admin_mode');
-    if (adminMode !== null) {
-      toggle.checked = adminMode === '1';
-    }
-  }
-});
-</script>
 
 {{ template "footer.gohtml" .Data }}
 </body>

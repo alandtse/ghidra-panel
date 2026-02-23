@@ -13,7 +13,7 @@
       <span style="color: #ff9800;">● Ghidra Server Offline</span>
       {{ end }}
       {{ if .Ghidra }}
-      <span style="opacity: 0.6;"> — {{ .Ghidra.Hostname }}:{{ .Ghidra.Port }}</span>
+      <span style="opacity: 0.6;"> — <a href="ghidra://{{ .Ghidra.Hostname }}:{{ .Ghidra.Port }}" style="color: inherit; text-decoration: underline;">{{ .Ghidra.Hostname }}:{{ .Ghidra.Port }}</a></span>
       {{ end }}
     </small>
   </div>

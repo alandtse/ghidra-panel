@@ -12,11 +12,52 @@
     {{ end }}
   </ul>
   {{ if .Identity }}
-  <ul>
+  <ul style="align-items: center;">
     {{ if .SuperAdmin }}
+    <li>
+      <label style="margin-bottom: 0; display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+        <input type="checkbox" id="adminModeToggle" onchange="toggleAdminMode(this.checked)" checked style="margin-bottom: 0;">
+        <span style="font-size: 0.9em; opacity: 0.8;">View as Admin</span>
+      </label>
+    </li>
     <li><a href="/admin">Admin</a></li>
     {{ end }}
     <li><a href="/logout">Logout</a></li>
   </ul>
   {{ end }}
 </nav>
+
+{{ if .SuperAdmin }}
+<script>
+function toggleAdminMode(enabled) {
+  sessionStorage.setItem('adminMode', enabled ? 'true' : 'false');
+  
+  // Maintain current URL path but toggle the query parameter
+  const url = new URL(window.location.href);
+  url.searchParams.set('admin_mode', enabled ? '1' : '0');
+  window.location.href = url.toString();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  const toggle = document.getElementById('adminModeToggle');
+  if (!toggle) return;
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlMode = urlParams.get('admin_mode');
+  const sessionMode = sessionStorage.getItem('adminMode');
+
+  if (urlMode !== null) {
+    toggle.checked = (urlMode === '1');
+    sessionStorage.setItem('adminMode', toggle.checked ? 'true' : 'false');
+  } else if (sessionMode !== null) {
+    toggle.checked = (sessionMode === 'true');
+    // If we're on the home page and the session differs from the default URL, redirect to apply
+    if (window.location.pathname === '/' && sessionMode === 'false') {
+      toggleAdminMode(false);
+    }
+  } else {
+    toggle.checked = true;
+  }
+});
+</script>
+{{ end }}
