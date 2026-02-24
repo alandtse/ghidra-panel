@@ -20,7 +20,9 @@
         <span style="font-size: 0.9em; opacity: 0.8;">View as Admin</span>
       </label>
     </li>
+    {{ if not .AdminModeDisabled }}
     <li><a href="/admin">Admin</a></li>
+    {{ end }}
     {{ end }}
     <li><a href="/logout">Logout</a></li>
   </ul>

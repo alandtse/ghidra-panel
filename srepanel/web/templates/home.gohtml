@@ -34,7 +34,7 @@
   <h1>Hi, {{ .Data.Identity.Username }}!</h1>
   {{ template "status.gohtml" .Data }}
   
-  {{ if .Data.SuperAdmin }}
+  {{ if and .Data.SuperAdmin (not .Data.AdminModeDisabled) }}
   <article style="border-left: 4px solid {{ permColor 2 }}; background: rgba(76, 175, 80, 0.05);">
     <header>
       <strong>🔑 Panel Super Admin</strong>
@@ -48,7 +48,7 @@
   </article>
   {{ end }}
   
-  {{ if .Data.SuperAdmin }}
+  {{ if and .Data.SuperAdmin (not .Data.AdminModeDisabled) }}
   <article>
     <header>
       <strong>Repository Access</strong>
@@ -99,7 +99,7 @@
   </article>
   {{ end }}
 
-  {{ if not .Data.SuperAdmin }}
+  {{ if or (not .Data.SuperAdmin) .Data.AdminModeDisabled }}
   <div class="grid">
   <article>
     <header>
@@ -194,6 +194,21 @@
       <small>
         <i class="fa fa-lock"></i> Your username is linked to your <strong>{{ .Data.Identity.Provider }}</strong> account and cannot be changed.
       </small>
+
+      <hr>
+      <header>
+        <strong>Client Setup</strong>
+      </header>
+      <p><small>To connect your local Ghidra client to this server, you must ensure your client username matches your panel username (<samp>{{ .Data.UserState.Username }}</samp>).</small></p>
+      <ol style="font-size: 0.9em; padding-left: 1.5rem;">
+        <li>Locate your local Ghidra installation directory.</li>
+        <li>Open <samp>support/launch.properties</samp> in a text editor.</li>
+        <li>Add the following line (usually near the top):<br>
+          <code style="display: block; margin-top: 0.5rem; padding: 0.5rem; background: var(--pico-code-background-color); border-radius: var(--pico-border-radius);">VMARGS=-Duser.name={{ .Data.UserState.Username }}</code>
+        </li>
+        <li>Restart your Ghidra client.</li>
+      </ol>
+      <small><i class="fa fa-info-circle"></i> If you skip this step, Ghidra will attempt to log in using your computer's local account name, which will result in an "Access Denied" error.</small>
     </article>
 
     <article>
@@ -211,6 +226,49 @@
           <br><strong>Tip:</strong> Save the password to your password manager after generating.
         </small>
       </form>
+    </article>
+
+    <article>
+      <header>
+        <strong>Linked Accounts</strong>
+      </header>
+      <p><small>Log in with any linked account to access this Ghidra identity.</small></p>
+      <ul style="list-style: none; padding-left: 0; margin-bottom: 0;">
+        <li style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; padding: 0.5rem; background: var(--pico-background-color); border: 1px solid var(--pico-muted-border-color); border-radius: var(--pico-border-radius);">
+          <div>
+            <strong>{{ .Data.Identity.Provider }}</strong> <small>(Primary)</small>
+            <br><small>{{ .Data.Identity.Username }}</small>
+          </div>
+        </li>
+        {{ range .Data.LinkedAccounts }}
+        <li style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; padding: 0.5rem; background: var(--pico-background-color); border: 1px solid var(--pico-muted-border-color); border-radius: var(--pico-border-radius);">
+          <div>
+            <strong>{{ .Provider }}</strong>
+            <br><small>{{ .Username }}</small>
+          </div>
+          <form action="/unlink_account" method="post" style="margin: 0;">
+            {{ $.CSRFField }}
+            <input type="hidden" name="provider" value="{{ .Provider }}">
+            <input type="hidden" name="id" value="{{ .ID }}">
+            <button class="outline contrast" type="submit" style="margin: 0; padding: 0.25rem 0.5rem; font-size: 0.8em; border: none;" title="Unlink Account" onclick="return confirm('Unlink this account? You will no longer be able to log in with it.')">
+              <i class="fa fa-unlink"></i> Unlink
+            </button>
+          </form>
+        </li>
+        {{ end }}
+      </ul>
+      {{ if .Data.AvailableProviders }}
+      <div style="margin-top: 1rem; border-top: 1px solid var(--pico-muted-border-color); padding-top: 1rem;">
+        <strong>Link New Account</strong>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+          {{ range .Data.AvailableProviders }}
+          <a role="button" class="outline" href="/oauth/{{ .Name }}?link=true" style="padding: 0.5rem 1rem;">
+            <i class="fa fa-link"></i> {{ .DisplayName }}
+          </a>
+          {{ end }}
+        </div>
+      </div>
+      {{ end }}
     </article>
     {{ else }}
     <article>
@@ -230,6 +288,21 @@
     </article>
     {{ end }}
   </div>
+
+  {{ if and .Data.UserState .Data.UserState.HasPassword }}
+  <article style="border: 1px solid var(--pico-del-color); margin-top: var(--pico-spacing);">
+    <header style="background-color: rgba(216, 27, 96, 0.05); color: var(--pico-del-color);">
+      <strong>Danger Zone</strong>
+    </header>
+    <p>Permanently delete your Ghidra account, your repository access, and all associated OAuth login identities. This action cannot be undone.</p>
+    <form action="/delete_account" method="post" style="margin-bottom: 0;">
+      {{.CSRFField}}
+      <button role="button" type="submit" class="outline contrast" style="color: var(--pico-del-color); border-color: var(--pico-del-color);" onclick="return prompt('Are you absolutely sure you want to delete your account? Type DELETE to confirm.') === 'DELETE'">
+        <i class="fa fa-trash-alt"></i> Delete Account
+      </button>
+    </form>
+  </article>
+  {{ end }}
 </main>
 
 

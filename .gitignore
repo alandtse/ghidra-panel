@@ -37,3 +37,6 @@ coverage
 .vscode/
 .DS_Store
 .gradle_home
+
+# MaxMind databases
+.mmdb

@@ -7,18 +7,19 @@ import (
 	"strings"
 
 	"go.mkw.re/ghidra-panel/common"
+	"go.mkw.re/ghidra-panel/database"
 	"go.mkw.re/ghidra-panel/ghidra"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type HomeState struct {
 	*State
-	ACL               []common.UserRepoAccessDisplay
-	GhidraUsername    string
-	GhidraVersion     string
-	Repos             []string
-	SuperAdmin        bool
-	AdminModeDisabled bool
+	ACL                []common.UserRepoAccessDisplay
+	GhidraUsername     string
+	GhidraVersion      string
+	Repos              []string
+	LinkedAccounts     []database.LinkedAccount
+	AvailableProviders []*common.ProviderMetadata
 }
 
 func (s *Server) handleHome(wr http.ResponseWriter, req *http.Request) {
@@ -31,12 +32,6 @@ func (s *Server) handleHome(wr http.ResponseWriter, req *http.Request) {
 	if !s.authenticateState(wr, req, state.State) {
 		return
 	}
-	state.SuperAdmin = s.isSuperAdmin(req.Context(), state.Identity)
-
-	// Check if admin mode is disabled via query parameter
-	adminModeParam := req.URL.Query().Get("admin_mode")
-	state.AdminModeDisabled = adminModeParam == "0"
-
 	// If admin mode is disabled, treat as regular user for repository listing
 	viewAsAdmin := state.SuperAdmin && !state.AdminModeDisabled
 
@@ -44,6 +39,37 @@ func (s *Server) handleHome(wr http.ResponseWriter, req *http.Request) {
 		log.Printf("Home page: User %s (ID: %d, Provider: %s) - SuperAdmin: %v, ViewAsAdmin: %v",
 			state.Identity.Username, state.Identity.ID, state.Identity.Provider, state.SuperAdmin, viewAsAdmin)
 	}
+
+	// Fetch linked accounts
+	linkedAccounts, err := s.DB.GetLinkedAccounts(req.Context(), state.Identity.ID, state.Identity.Provider)
+	if err != nil {
+		log.Println("Warning: Failed to fetch linked accounts:", err)
+	}
+	state.LinkedAccounts = linkedAccounts
+
+	// Determine available providers to link
+	linkedMap := make(map[string]bool)
+	linkedMap[state.Identity.Provider] = true // Don't allow linking the primary provider
+	for _, l := range linkedAccounts {
+		linkedMap[l.Provider] = true
+	}
+
+	for name := range s.Providers {
+		if !linkedMap[name] {
+			metadata := s.ProviderMetadata[name]
+			if metadata == nil {
+				metadata = &common.ProviderMetadata{
+					Name:        name,
+					DisplayName: name,
+				}
+			}
+			state.AvailableProviders = append(state.AvailableProviders, metadata)
+		}
+	}
+	// Sort available providers
+	sort.Slice(state.AvailableProviders, func(i, j int) bool {
+		return state.AvailableProviders[i].Name < state.AvailableProviders[j].Name
+	})
 
 	// Fetch repository and user information from Ghidra
 	reply, err := s.Client.GetRepositories(req.Context(), &emptypb.Empty{})

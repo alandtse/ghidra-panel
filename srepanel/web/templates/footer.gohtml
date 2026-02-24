@@ -17,4 +17,22 @@
       {{ end }}
     </small>
   </div>
+  {{ if .HasGeoIP }}
+  <div style="text-align: center; margin-top: 0.5rem; opacity: 0.6;">
+    <small>This product includes GeoLite2 Data created by MaxMind, available from <a href="https://www.maxmind.com" target="_blank" rel="noopener">https://www.maxmind.com</a>.</small>
+  </div>
+  {{ end }}
 </footer>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialize simple-datatables on all tables with the class 'datatable'
+    document.querySelectorAll('.datatable').forEach(table => {
+        new simpleDatatables.DataTable(table, {
+            searchable: true,
+            fixedHeight: false,
+            perPage: 10,
+            perPageSelect: [10, 25, 50, 100]
+        });
+    });
+});
+</script>

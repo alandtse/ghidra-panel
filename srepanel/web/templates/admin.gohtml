@@ -81,6 +81,12 @@
                 <span class="stat-value">{{ formatUptime .Data.Stats.PanelUptime }}</span>
                 <span class="stat-label">⏱️ Panel Uptime</span>
             </div>
+            {{ if .Data.HasGeoIP }}
+            <div class="stat-card">
+                <span class="stat-value">{{ .Data.Stats.GeoIPType }}</span>
+                <span class="stat-label">🌍 GeoIP ({{ formatTime .Data.Stats.GeoIPBuildDate }})</span>
+            </div>
+            {{ end }}
         </div>
     </article>
 
@@ -98,7 +104,7 @@
         </details>
         {{ if .Data.RecentActivity | len }}
         <figure>
-            <table>
+            <table class="datatable">
                 <thead>
                     <tr>
                         <th>Time</th>
@@ -119,6 +125,7 @@
                             {{ if .ResourceName }}
                                 <samp>{{ .ResourceName }}</samp>
                                 {{ if .ResourceType }}<small>({{ .ResourceType }})</small>{{ end }}
+                                {{ if .Details }}<br><small class="muted">{{ formatDetails .Details }}</small>{{ end }}
                             {{ else }}
                                 -
                             {{ end }}
@@ -137,40 +144,146 @@
 
     <article>
         <header>
-            <strong>👥 User Management</strong>
+            <strong>👥 Panel Users</strong>
         </header>
         {{ if .Data.Users | len }}
+        <form action="/admin/bulk_user_action" method="post" style="margin: 0;">
+            {{ $.CSRFField }}
+            <div style="margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: center;">
+                <select name="action" required style="width: auto; margin-bottom: 0;">
+                    <option value="" disabled selected>Bulk Actions...</option>
+                    <option value="delete">Delete Selected</option>
+                </select>
+                <button type="submit" class="outline" style="width: auto; margin-bottom: 0;" onclick="return confirm('Execute bulk action on selected users?')">Apply</button>
+            </div>
         <figure>
-            <table>
+            <table class="datatable">
                 <thead>
                     <tr>
+                        <th style="width: 40px;"><input type="checkbox" onclick="document.querySelectorAll('.user-cb').forEach(cb => cb.checked = this.checked)"></th>
                         <th>Username</th>
                         <th>Provider</th>
                         <th>Created</th>
                         <th>Repos</th>
                         <th>Last Login</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {{ range $user := .Data.Users }}
                     <tr>
-                        <td><samp>{{ .Username }}</samp></td>
                         <td>
-                            {{ if .ProfileURL }}
-                                <a href="{{ .ProfileURL }}" target="_blank" rel="noopener" title="View {{ .Provider }} profile">
-                                    {{ .Provider }} 🔗
-                                </a>
+                            <!-- Don't let users bulk-delete themselves via UI easily, though backend prevents it too -->
+                            <input type="checkbox" class="user-cb" name="selected_users" value="{{ .UserID }}|{{ .Provider }}|{{ .Username }}" {{ if and (eq $.Data.Identity.ID .UserID) (eq $.Data.Identity.Provider .Provider) }}disabled{{ end }}>
+                        </td>
+                        <td>
+                            {{ if .Username }}
+                                <samp>{{ .Username }}</samp>
                             {{ else }}
-                                {{ .Provider }}
+                                <em>[No Ghidra Account]</em>
+                            {{ end }}
+                            {{ if and .OAuthUsername (ne .OAuthUsername .Username) }}
+                                <br><small class="muted" style="color: var(--pico-muted-color);">OAuth: {{ .OAuthUsername }}</small>
+                            {{ end }}
+                            <br><small class="muted" style="color: var(--pico-muted-color);" title="Internal Identity Hash">ID: <samp>{{ .Provider }}/{{ .UserID }}</samp></small>
+                            {{ if .IsAdmin }} <span class="action-badge" style="background: var(--pico-primary-background); color: var(--pico-primary-inverse); font-size: 0.7em;">Admin</span>{{ end }}
+                        </td>
+                        <td>
+                            {{ $profileURL := .ProfileURL }}
+                            {{ range $i, $p := .Providers }}
+                                {{ if $i }}, {{ end }}
+                                {{ if and (eq $i 0) $profileURL }}
+                                    <a href="{{ $profileURL }}" target="_blank" rel="noopener" title="View {{ $p }} profile">
+                                        {{ $p }} 🔗
+                                    </a>
+                                {{ else }}
+                                    {{ $p }}
+                                {{ end }}
                             {{ end }}
                         </td>
-                        <td><small>{{ formatDate .CreatedAt }}</small></td>
+                        <td data-sort="{{ .CreatedAt }}"><small>{{ formatDate .CreatedAt }}</small></td>
                         <td>{{ .RepoCount }}</td>
-                        <td>
+                        <td data-sort="{{ if .LastLoginAt }}{{ .LastLoginAt }}{{ else }}0{{ end }}">
                             {{ if .LastLoginAt }}
                                 <small>{{ formatDate .LastLoginAt }}</small>
                             {{ else }}
                                 <small><em>Never</em></small>
+                            {{ end }}
+                        </td>
+                        <td>
+                            <button type="submit" form="delete-user-{{ .UserID }}" class="outline contrast" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; border: none; color: var(--pico-del-color);" onclick="return prompt('Are you sure you want to delete user {{ if .Username }}{{ .Username }}{{ else }}{{ .Provider }}/{{ .UserID }}{{ end }}? Type DELETE to confirm.') === 'DELETE'" title="Delete user">
+                                <i class="fa fa-trash"></i> Delete
+                            </button>
+                        </td>
+                    </tr>
+                    {{ end }}
+                </tbody>
+            </table>
+        </figure>
+        </form>
+        {{ range $user := .Data.Users }}
+        <form id="delete-user-{{ .UserID }}" action="/admin/delete_user" method="post" style="display:none;">
+            {{ $.CSRFField }}
+            <input type="hidden" name="user_id" value="{{ .UserID }}">
+            <input type="hidden" name="provider" value="{{ .Provider }}">
+            <input type="hidden" name="username" value="{{ .Username }}">
+        </form>
+        {{ end }}
+        {{ else }}
+        <p>No users found.</p>
+        {{ end }}
+    </article>
+    <article>
+        <header>
+            <strong>🔌 Ghidra Server Users</strong>
+        </header>
+        <p><small>This list shows all user accounts actually present on the Ghidra server. Accounts marked as "Orphaned" can log into Ghidra but have no linked panel account.</small></p>
+        {{ if .Data.GhidraUsers | len }}
+        <form action="/admin/bulk_ghidra_user_action" method="post" style="margin: 0;">
+            {{ $.CSRFField }}
+            <div style="margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: center;">
+                <select name="action" required style="width: auto; margin-bottom: 0;">
+                    <option value="" disabled selected>Bulk Actions...</option>
+                    <option value="delete">Delete Selected</option>
+                </select>
+                <button type="submit" class="outline" style="width: auto; margin-bottom: 0;" onclick="return confirm('Execute bulk action on selected Ghidra users?')">Apply</button>
+            </div>
+        <figure>
+            <table class="datatable">
+                <thead>
+                    <tr>
+                        <th style="width: 40px;"><input type="checkbox" onclick="document.querySelectorAll('.ghidra-cb').forEach(cb => { if(!cb.disabled) cb.checked = this.checked })"></th>
+                        <th>Username</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ range $user := .Data.GhidraUsers }}
+                    <tr>
+                        <td>
+                            <input type="checkbox" class="ghidra-cb" name="selected_ghidra_users" value="{{ .Username }}" {{ if .IsLinked }}disabled title="Manage via Panel User"{{ end }}{{ if eq $.Data.UserState.Username .Username }}disabled title="Cannot delete your own account"{{ end }}>
+                        </td>
+                        <td>
+                            <samp>{{ .Username }}</samp>
+                            {{ if .IsLinked }}
+                                <br><small class="muted" style="color: var(--pico-muted-color);" title="Linked Identity">Owner: <samp>{{ .LinkedIdent }}</samp></small>
+                            {{ end }}
+                        </td>
+                        <td>
+                            {{ if .IsLinked }}
+                                <span class="action-badge action-access_granted">Linked</span>
+                            {{ else }}
+                                <span class="action-badge action-login_failed" title="This user exists on the Ghidra server but has no panel account">Orphaned</span>
+                            {{ end }}
+                        </td>
+                        <td>
+                            {{ if not .IsLinked }}
+                            <button type="submit" form="delete-ghidra-{{ .Username }}" class="outline contrast" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; border: none; color: var(--pico-del-color);" onclick="return prompt('Are you sure you want to permanently delete Ghidra user {{ .Username }}? Type DELETE to confirm.') === 'DELETE'" title="Delete Ghidra user">
+                                <i class="fa fa-trash"></i> Delete
+                            </button>
+                            {{ else }}
+                            <small class="muted">Manage via Panel User</small>
                             {{ end }}
                         </td>
                     </tr>
@@ -178,8 +291,79 @@
                 </tbody>
             </table>
         </figure>
+        </form>
+        {{ range $user := .Data.GhidraUsers }}
+        <form id="delete-ghidra-{{ .Username }}" action="/admin/delete_ghidra_user" method="post" style="display:none;">
+            {{ $.CSRFField }}
+            <input type="hidden" name="username" value="{{ .Username }}">
+        </form>
+        {{ end }}
         {{ else }}
-        <p>No users found.</p>
+        <p>No Ghidra users found. Make sure the server is online.</p>
+        {{ end }}
+    </article>
+    <article>
+        <header>
+            <strong>🗄️ Repositories</strong>
+        </header>
+        <p><small>This list shows all project repositories found on the Ghidra server.</small></p>
+        {{ if .Data.Repositories | len }}
+        <form action="/admin/bulk_repository_action" method="post" style="margin: 0;">
+            {{ $.CSRFField }}
+            <div style="margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: center;">
+                <select name="action" required style="width: auto; margin-bottom: 0;">
+                    <option value="" disabled selected>Bulk Actions...</option>
+                    <option value="delete">Delete Selected</option>
+                </select>
+                <button type="submit" class="outline" style="width: auto; margin-bottom: 0;" onclick="return confirm('Execute bulk action on selected repositories? This cannot be undone.')">Apply</button>
+            </div>
+        <figure>
+            <table class="datatable">
+                <thead>
+                    <tr>
+                        <th style="width: 40px;"><input type="checkbox" onclick="document.querySelectorAll('.repo-cb').forEach(cb => cb.checked = this.checked)"></th>
+                        <th>Name</th>
+                        <th>Size</th>
+                        <th>Files</th>
+                        <th>Users</th>
+                        <th>Timeline</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ range $repo := .Data.Repositories }}
+                    <tr>
+                        <td>
+                            <input type="checkbox" class="repo-cb" name="selected_repositories" value="{{ .Name }}">
+                        </td>
+                        <td><samp>{{ .Name }}</samp></td>
+                        <td data-sort="{{ if .Stats }}{{ .Stats.SizeBytes }}{{ else }}0{{ end }}">{{ if .Stats }}{{ formatSize .Stats.SizeBytes }}{{ else }}-{{ end }}</td>
+                        <td data-sort="{{ if .Stats }}{{ .Stats.FileCount }}{{ else }}0{{ end }}">{{ if .Stats }}{{ .Stats.FileCount }}{{ else }}-{{ end }}</td>
+                        <td data-sort="{{ if .Stats }}{{ .Stats.UserCount }}{{ else }}0{{ end }}">{{ if .Stats }}{{ .Stats.UserCount }}{{ else }}-{{ end }}</td>
+                        <td data-sort="{{ if .Stats }}{{ .Stats.CreatedTime }}{{ else }}0{{ end }}">
+                            {{ if .Stats }}
+                                <small>Created: {{ formatDate .Stats.CreatedTime }}<br>Modified: {{ formatDate .Stats.LastModifiedTime }}</small>
+                            {{ else }}-{{ end }}
+                        </td>
+                        <td>
+                            <button type="submit" form="delete-repo-{{ .Name }}" class="outline contrast" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; border: none; color: var(--pico-del-color);" onclick="return prompt('Are you sure you want to permanently delete repository {{ .Name }} and all of its contents? Type DELETE to confirm.') === 'DELETE'" title="Delete repository">
+                                <i class="fa fa-trash"></i> Delete
+                            </button>
+                        </td>
+                    </tr>
+                    {{ end }}
+                </tbody>
+            </table>
+        </figure>
+        </form>
+        {{ range $repo := .Data.Repositories }}
+        <form id="delete-repo-{{ .Name }}" action="/admin/delete_repository" method="post" style="display:none;">
+            {{ $.CSRFField }}
+            <input type="hidden" name="repository" value="{{ .Name }}">
+        </form>
+        {{ end }}
+        {{ else }}
+        <p>No repositories found. Create one by connecting with the Ghidra client.</p>
         {{ end }}
     </article>
 </main>
