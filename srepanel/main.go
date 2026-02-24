@@ -156,6 +156,27 @@ func main() {
 
 	issuer := token.NewIssuer(secrets.HMACSecret, tokenValidity)
 
+	// Auto-discover GeoIP Database if not explicitly set
+	geoIPPath := cfg.GeoIPDatabase
+	if geoIPPath == "" {
+		// Common locations to check
+		candidatePaths := []string{
+			"/data/GeoLite2-City.mmdb",
+			"GeoLite2-City.mmdb",
+		}
+		for _, path := range candidatePaths {
+			if _, err := os.Stat(path); err == nil {
+				geoIPPath = path
+				break
+			}
+		}
+
+		// If still empty but credentials are set, default to standard location
+		if geoIPPath == "" && cfg.MaxMindAccountID != "" {
+			geoIPPath = "/data/GeoLite2-City.mmdb"
+		}
+	}
+
 	webConfig := web.Config{
 		CommunityName:     cfg.CommunityName,
 		BaseURL:           cfg.BaseURL,
@@ -166,7 +187,7 @@ func main() {
 		Dev:               *dev,
 		SuperAdmins:       cfg.SuperAdmins,
 		FirstUserIsAdmin:  cfg.FirstUserIsAdmin,
-		GeoIPDatabase:     cfg.GeoIPDatabase,
+		GeoIPDatabase:     geoIPPath,
 	}
 	server, err := web.NewServer(&webConfig, db, auth, &issuer, client)
 	if err != nil {

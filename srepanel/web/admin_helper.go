@@ -2,6 +2,8 @@ package web
 
 import (
 	"context"
+	"fmt"
+
 	"go.mkw.re/ghidra-panel/common"
 )
 
@@ -9,8 +11,15 @@ import (
 // Checks config-based super_admins, panel_admins table, and legacy is_super_admin column
 func (s *Server) isSuperAdmin(ctx context.Context, ident *common.Identity) bool {
 	// Check config-based super admins (highest priority)
-	for _, id := range s.Config.SuperAdmins {
-		if id == ident.ID {
+	// Format is now "provider:id" (e.g. "github:1234") or just "1234" for legacy Discord fallback
+	identStr := fmt.Sprintf("%s:%d", ident.Provider, ident.ID)
+	for _, idStr := range s.Config.SuperAdmins {
+		if idStr == identStr {
+			return true
+		}
+		// Legacy support: if the user just put a naked ID, assume it's for their current provider
+		// (this retains backwards compatibility while allowing exact matching going forward)
+		if idStr == fmt.Sprintf("%d", ident.ID) {
 			return true
 		}
 	}

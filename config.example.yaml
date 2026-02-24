@@ -71,6 +71,8 @@ links:
   - name: "GitHub"
     url: "https://github.com/mkw-re/ghidra-panel"
 
+# List of super admins defined as "provider:id" (e.g. "github:7086117" or "discord:559242081072316417")
+# Legacy raw integers are also supported but less secure across providers.
 super_admins: []
 first_user_is_admin: true
 
@@ -78,7 +80,8 @@ first_user_is_admin: true
 # Shows flag emoji + city/country for IPs in audit logs on admin dashboard
 # Download from https://www.maxmind.com/en/geolite2/signup (free account)
 # See GEOIP_SETUP.md for setup instructions
-# geoip_database: "GeoLite2-City.mmdb"
+# maxmind_account_id: ""
+# maxmind_license_key: ""
 
 # Optional: Number of days to retain audit logs (default: 90)
 # Old logs are automatically cleaned up daily at midnight

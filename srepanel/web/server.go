@@ -47,7 +47,9 @@ func init() {
 			"permDisplay":    ghidra.PermDisplay,
 			"formatSize":     formatSize,
 			"formatDate":     formatDate,
+			"formatTime":     formatTime,
 			"formatUptime":   formatUptime,
+			"formatDetails":  formatDetails,
 			"actionDesc":     database.GetActionDescription,
 			"formatLocation": formatLocation,
 		}).
@@ -71,9 +73,11 @@ type Config struct {
 	DiscordApp        *discord.Application
 	DiscordWebhookURL string
 	Dev               bool // developer mode
-	SuperAdmins       []uint64
+	SuperAdmins       []string
 	FirstUserIsAdmin  bool
 	GeoIPDatabase     string // path to GeoLite2-City.mmdb (optional)
+	MaxMindAccountID  string
+	MaxMindLicenseKey string
 }
 
 type Server struct {
@@ -146,7 +150,15 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) http.Handler {
 	mux.HandleFunc("POST /set_user_access", s.handleSetUserAccess)
 	mux.HandleFunc("POST /update_repo", s.handleUpdateRepo)
 	mux.HandleFunc("POST /delete_repo", s.handleDeleteRepo)
+	mux.HandleFunc("POST /unlink_account", s.handleUnlinkAccount)
+	mux.HandleFunc("POST /delete_account", s.handleDeleteAccount)
 	mux.HandleFunc("GET /admin", s.handleAdmin)
+	mux.HandleFunc("POST /admin/delete_user", s.handleAdminDeleteUser)
+	mux.HandleFunc("POST /admin/bulk_user_action", s.handleAdminBulkUserAction)
+	mux.HandleFunc("POST /admin/delete_ghidra_user", s.handleAdminDeleteGhidraUser)
+	mux.HandleFunc("POST /admin/bulk_ghidra_user_action", s.handleAdminBulkGhidraUserAction)
+	mux.HandleFunc("POST /admin/delete_repository", s.handleAdminDeleteRepository)
+	mux.HandleFunc("POST /admin/bulk_repository_action", s.handleAdminBulkRepositoryAction)
 
 	// CSRF Protection
 	var trustedOrigins []string
@@ -166,7 +178,7 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) http.Handler {
 
 	// Create file server for assets (exempt from CSRF but needs security headers)
 	// Note: We apply security headers to assets too just to be safe/consistent
-	assetHandler := s.securityMiddleware(http.StripPrefix("/assets/", http.FileServer(http.FS(assets))))
+	assetHandler := s.securityMiddleware(http.FileServer(http.FS(assets)))
 	mux.Handle("GET /assets/", assetHandler)
 
 	return handler
@@ -196,16 +208,18 @@ func (s *Server) renderTemplate(wr http.ResponseWriter, req *http.Request, tmpl 
 
 // State holds server-side web page state.
 type State struct {
-	Identity      *common.Identity // current user, null if unauthenticated
-	UserState     *common.UserState
-	Nav           []Nav         // navigation bar
-	Links         []common.Link // footer links
-	Ghidra        *common.GhidraEndpoint
-	Status        string
-	GhidraOnline  bool   // whether Ghidra server is reachable
-	GhidraVersion string // Ghidra server version (if online)
-	CommunityName string // Community/server name for display
-	SuperAdmin    bool   // whether current user is a super admin
+	Identity          *common.Identity // current user, null if unauthenticated
+	UserState         *common.UserState
+	Nav               []Nav         // navigation bar
+	Links             []common.Link // footer links
+	Ghidra            *common.GhidraEndpoint
+	Status            string
+	GhidraOnline      bool   // whether Ghidra server is reachable
+	GhidraVersion     string // Ghidra server version (if online)
+	CommunityName     string // Community/server name for display
+	SuperAdmin        bool   // whether current user is a super admin
+	AdminModeDisabled bool   // whether the user has toggled off admin view
+	HasGeoIP          bool   // whether GeoIP database is loaded
 }
 
 type Nav struct {
@@ -237,17 +251,22 @@ func (s *Server) stateWithNav(req *http.Request, nav ...Nav) *State {
 
 	communityName := s.Config.CommunityName
 	if communityName == "" {
-		communityName = "Ghidra Panel"
+		communityName = "Ghidra"
 	}
 
+	// Check if admin mode is disabled via query parameter
+	adminModeParam := req.URL.Query().Get("admin_mode")
+
 	return &State{
-		Ghidra:        s.Config.GhidraEndpoint,
-		Nav:           nav,
-		Links:         s.Config.Links,
-		Status:        req.URL.Query().Get("status"),
-		GhidraOnline:  ghidraOnline,
-		GhidraVersion: ghidraVersion,
-		CommunityName: communityName,
+		Ghidra:            s.Config.GhidraEndpoint,
+		Nav:               nav,
+		Links:             s.Config.Links,
+		Status:            req.URL.Query().Get("status"),
+		GhidraOnline:      ghidraOnline,
+		GhidraVersion:     ghidraVersion,
+		CommunityName:     communityName,
+		AdminModeDisabled: adminModeParam == "0",
+		HasGeoIP:          s.GeoIPDB != nil,
 	}
 }
 

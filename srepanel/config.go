@@ -69,10 +69,12 @@ type config struct {
 		Endpoint common.GhidraEndpoint `yaml:"endpoint"`
 		GRPCAddr string                `yaml:"grpc_addr"`
 	} `yaml:"ghidra"`
-	Links            []common.Link `yaml:"links"`
-	SuperAdmins      []uint64      `yaml:"super_admins"`
-	FirstUserIsAdmin bool          `yaml:"first_user_is_admin"`
-	GeoIPDatabase    string        `yaml:"geoip_database"`
+	Links             []common.Link `yaml:"links"`
+	SuperAdmins       []string      `yaml:"super_admins"`
+	FirstUserIsAdmin  bool          `yaml:"first_user_is_admin"`
+	GeoIPDatabase     string        `yaml:"geoip_database"`
+	MaxMindAccountID  string        `yaml:"maxmind_account_id"`
+	MaxMindLicenseKey string        `yaml:"maxmind_license_key"`
 
 	// Optional: Number of days to retain audit logs (default: 90)
 	// Old logs are automatically cleaned up daily
