@@ -1,12 +1,14 @@
 package web
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
 	"sort"
 
 	"go.mkw.re/ghidra-panel/common"
+	"go.mkw.re/ghidra-panel/ghidra"
 )
 
 func (s *Server) handleLogin(wr http.ResponseWriter, req *http.Request) {
@@ -102,6 +104,18 @@ func (s *Server) handleOAuthProvider(wr http.ResponseWriter, req *http.Request) 
 		return
 	}
 
+	if req.URL.Query().Get("link") == "true" {
+		// Set a short-lived cookie to remember this is a linking operation
+		http.SetCookie(wr, &http.Cookie{
+			Name:     "oauth_link",
+			Value:    "1",
+			Path:     "/",
+			MaxAge:   300, // 5 minutes
+			HttpOnly: true,
+			Secure:   s.useSecureCookie,
+		})
+	}
+
 	http.Redirect(wr, req, provider.AuthURL(), http.StatusSeeOther)
 }
 
@@ -152,9 +166,75 @@ func (s *Server) handleOAuthRedirect(wr http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	// Record OAuth login in database (source of truth for provider)
+	// Check if this is a linking operation
+	linkCookie, _ := req.Cookie("oauth_link")
+	isLinking := linkCookie != nil && linkCookie.Value == "1"
+
+	if isLinking {
+		// Clear link cookie
+		http.SetCookie(wr, &http.Cookie{
+			Name:   "oauth_link",
+			Value:  "",
+			Path:   "/",
+			MaxAge: 0,
+		})
+
+		// Verify existing session
+		existingIdent, ok := s.checkAuth(req)
+		if !ok {
+			log.Println("Linking failed: user not authenticated")
+			http.Error(wr, "Linking failed: not authenticated", http.StatusUnauthorized)
+			return
+		}
+
+		// Record the OAuth login for the secondary identity
+		if err := s.DB.RecordOAuthLogin(req.Context(), ident); err != nil {
+			log.Printf("Warning: Failed to record incoming OAuth login for linking: %v", err)
+		}
+
+		// Ensure we aren't linking the same provider (or account to itself)
+		if existingIdent.Provider != ident.Provider || existingIdent.ID != ident.ID {
+			// Link them
+			err := s.DB.LinkAccount(req.Context(), existingIdent.ID, existingIdent.Provider, ident.ID, ident.Provider)
+			if err != nil {
+				log.Println("Failed to link account:", err)
+				http.Error(wr, "Failed to link account", http.StatusInternalServerError)
+				return
+			}
+			log.Printf("Linked %s/%d to primary %s/%d", ident.Provider, ident.ID, existingIdent.Provider, existingIdent.ID)
+		}
+
+		// Redirect back to home so they can see the connected accounts
+		s.redirectHome(wr, req)
+		return
+	}
+
+	// Normal Login: Record OAuth login in database (source of truth for provider)
 	if err := s.DB.RecordOAuthLogin(req.Context(), ident); err != nil {
 		log.Printf("Warning: Failed to record OAuth login: %v", err)
+	}
+
+	// Resolve primary identity (in case they logged in with a secondary linked account)
+	primaryID, primaryProvider, err := s.DB.ResolvePrimaryIdentity(req.Context(), ident.ID, ident.Provider)
+	if err != nil {
+		log.Println("Failed to resolve primary identity:", err)
+		http.Error(wr, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if primaryID != ident.ID || primaryProvider != ident.Provider {
+		// Login is via a secondary account, swap identity to the primary one
+		_, primaryUsername, err := s.DB.GetOAuthIdentity(req.Context(), primaryID)
+		if err != nil {
+			log.Println("Failed to fetch primary identity username:", err)
+		}
+		log.Printf("Login via secondary account %s/%d resolved to primary %s/%d", ident.Provider, ident.ID, primaryProvider, primaryID)
+
+		ident.ID = primaryID
+		ident.Provider = primaryProvider
+		if primaryUsername != "" {
+			ident.Username = primaryUsername
+		}
 	}
 
 	// Check if this is the first user and should be granted panel admin
@@ -277,4 +357,109 @@ func (s *Server) redirectLogin(wr http.ResponseWriter, req *http.Request, store 
 		})
 	}
 	http.Redirect(wr, req, "/login", http.StatusSeeOther)
+}
+
+func (s *Server) handleUnlinkAccount(wr http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		http.Error(wr, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ident, ok := s.checkAuth(req)
+	if !ok {
+		http.Error(wr, "Not authorized", http.StatusUnauthorized)
+		return
+	}
+
+	if err := req.ParseForm(); err != nil {
+		http.Error(wr, "Invalid form", http.StatusBadRequest)
+		return
+	}
+
+	provider := req.FormValue("provider")
+	idStr := req.FormValue("id")
+
+	importStrconv := false
+	_ = importStrconv // dummy
+
+	// We need strconv to parse ID, let's use fmt.Sscanf since we don't want to mess with imports easily
+	var id uint64
+	_, err := fmt.Sscanf(idStr, "%d", &id)
+	if err != nil || provider == "" {
+		http.Error(wr, "Invalid parameters", http.StatusBadRequest)
+		return
+	}
+
+	// Verify the user actually owns this linked account
+	links, err := s.DB.GetLinkedAccounts(req.Context(), ident.ID, ident.Provider)
+	if err != nil {
+		log.Println("Failed to get linked accounts:", err)
+		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
+		return
+	}
+
+	owns := false
+	for _, l := range links {
+		if l.ID == id && l.Provider == provider {
+			owns = true
+			break
+		}
+	}
+
+	if !owns {
+		http.Error(wr, "Not authorized to unlink this account", http.StatusForbidden)
+		return
+	}
+
+	if err := s.DB.UnlinkAccount(req.Context(), id, provider); err != nil {
+		log.Println("Failed to unlink account:", err)
+		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
+		return
+	}
+
+	log.Printf("Unlinked %s/%d from primary %s/%d", provider, id, ident.Provider, ident.ID)
+
+	s.redirectHome(wr, req)
+}
+
+func (s *Server) handleDeleteAccount(wr http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		http.Error(wr, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ident, ok := s.checkAuth(req)
+	if !ok {
+		http.Error(wr, "Not authorized", http.StatusUnauthorized)
+		return
+	}
+
+	username := ident.Username
+	log.Printf("User %s (%s/%d) initiated account deletion", username, ident.Provider, ident.ID)
+
+	// 1. Delete from database (cascading across linked accounts)
+	if err := s.DB.DeleteAccount(req.Context(), ident.ID, ident.Provider); err != nil {
+		log.Println("Failed to delete account from database:", err)
+		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
+		return
+	}
+
+	// 2. Remove from Ghidra server via gRPC
+	if _, err := s.Client.RemoveUser(req.Context(), &ghidra.RemoveUserRequest{Username: username}); err != nil {
+		log.Printf("Warning: Failed to completely remove user %s from Ghidra server (may need manual cleanup): %v", username, err)
+	}
+
+	// 3. Log the audit event
+	s.logAuditSimple(req.Context(), &ident.ID, username, "account_deleted", "user", username, getClientIP(req), req.UserAgent(), true)
+
+	// 4. Clear their session cookie
+	http.SetCookie(wr, &http.Cookie{
+		Name:   "token",
+		Value:  "",
+		Path:   "/",
+		MaxAge: 0,
+	})
+
+	// 5. Kick them out
+	s.redirectLogin(wr, req, false)
 }
