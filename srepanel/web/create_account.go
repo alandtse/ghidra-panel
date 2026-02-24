@@ -81,15 +81,19 @@ func (s *Server) handleCreateAccount(wr http.ResponseWriter, req *http.Request) 
 
 	log.Printf("Creating Ghidra account for %s (provider: %s, ID: %d). Existing accounts: %d", ident.Username, ident.Provider, ident.ID, count)
 
-	if count == 0 && s.Config.FirstUserIsAdmin {
-		// First user gets admin privileges
-		log.Printf("→ Granting super admin privileges (first user)")
+	// Create the account in the database.
+	// We check if the user is already a super admin (e.g. from auth.go FirstUserIsAdmin panel_admins insertion).
+	// If so, we grant them the legacy is_super_admin flag in the passwords table for backward compatibility.
+	isAdmin := s.isSuperAdmin(req.Context(), ident)
+
+	if isAdmin {
+		log.Printf("→ Granting super admin privileges (legacy flag) to existing panel admin")
 		if err := s.DB.CreateAccountAsSuperAdmin(req.Context(), ident.ID, user, pass, ident.Provider); err != nil {
-			log.Println("Failed to create admin account for user:", err)
+			log.Println("Failed to create admin account password entry for user:", err)
 			http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
 			return
 		}
-		log.Printf("✓ Super admin account created: %s", user)
+		log.Printf("✓ Super admin legacy account created: %s", user)
 	} else {
 		if err := s.DB.CreateAccount(req.Context(), ident.ID, user, pass, ident.Provider); err != nil {
 			log.Println("Failed to create account for user:", err)
@@ -111,7 +115,7 @@ func (s *Server) handleCreateAccount(wr http.ResponseWriter, req *http.Request) 
 	// Log account creation
 	s.logAudit(req.Context(), req, "account_created", "user", user, true, map[string]interface{}{
 		"provider": ident.Provider,
-		"is_admin": count == 0 && s.Config.FirstUserIsAdmin,
+		"is_admin": isAdmin,
 	})
 
 	// Redirect to credentials page with auto-generated username and passphrase

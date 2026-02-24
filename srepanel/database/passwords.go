@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+
 	"go.mkw.re/ghidra-panel/common"
 	"golang.org/x/crypto/argon2"
 )
@@ -19,6 +20,7 @@ func (d *DB) GetUserState(ctx context.Context, ident *common.Identity) (*common.
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			hasPass = false
+			username = "" // Prevent leaking arbitrary OAuth usernames to the Ghidra repo permission checker
 		} else {
 			return nil, err
 		}
@@ -156,4 +158,72 @@ func (d *DB) SetUsername(ctx context.Context, id uint64, username string, provid
 		username, id, provider,
 	)
 	return err
+}
+
+// DeleteAccount completely removes a Ghidra user's account and any linked OAuth identities from the database
+func (d *DB) DeleteAccount(ctx context.Context, primaryID uint64, primaryProvider string) error {
+	tx, err := d.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// 1. Get all linked secondary accounts so we can remove their OAuth identities too
+	rows, err := tx.QueryContext(ctx, `
+		SELECT secondary_id, secondary_provider FROM account_links
+		WHERE primary_id = ? AND primary_provider = ?
+	`, primaryID, primaryProvider)
+	if err != nil {
+		return err
+	}
+
+	var secondaries []struct {
+		id       uint64
+		provider string
+	}
+	for rows.Next() {
+		var s struct {
+			id       uint64
+			provider string
+		}
+		if err := rows.Scan(&s.id, &s.provider); err != nil {
+			rows.Close()
+			return err
+		}
+		secondaries = append(secondaries, s)
+	}
+	rows.Close()
+
+	// 2. Delete the secondary OAuth identities
+	for _, s := range secondaries {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM oauth_identities WHERE id = ? AND provider = ?`, s.id, s.provider); err != nil {
+			return err
+		}
+	}
+
+	// 3. Delete the primary OAuth identity
+	resOAuth, err := tx.ExecContext(ctx, `DELETE FROM oauth_identities WHERE id = ? AND provider = ?`, primaryID, primaryProvider)
+	if err != nil {
+		return err
+	}
+	affectedOAuth, _ := resOAuth.RowsAffected()
+
+	// 4. Delete the account_links rules
+	if _, err := tx.ExecContext(ctx, `DELETE FROM account_links WHERE primary_id = ? AND primary_provider = ?`, primaryID, primaryProvider); err != nil {
+		return err
+	}
+
+	// 5. Delete the primary panel password account
+	result, err := tx.ExecContext(ctx, `DELETE FROM passwords WHERE id = ? AND provider = ?`, primaryID, primaryProvider)
+	if err != nil {
+		return err
+	}
+
+	affectedPass, _ := result.RowsAffected()
+
+	if affectedOAuth == 0 && affectedPass == 0 {
+		return fmt.Errorf("user not found or already deleted")
+	}
+
+	return tx.Commit()
 }
