@@ -200,14 +200,24 @@
         <strong>Client Setup</strong>
       </header>
       <p><small>To connect your local Ghidra client to this server, you must ensure your client username matches your panel username (<samp>{{ .Data.UserState.Username }}</samp>).</small></p>
-      <ol style="font-size: 0.9em; padding-left: 1.5rem;">
+      
+      <strong>Option 1: Permanent Config (Recommended)</strong>
+      <ol style="font-size: 0.9em; padding-left: 1.5rem; margin-bottom: 1rem;">
         <li>Locate your local Ghidra installation directory.</li>
         <li>Open <samp>support/launch.properties</samp> in a text editor.</li>
         <li>Add the following line (usually near the top):<br>
           <code style="display: block; margin-top: 0.5rem; padding: 0.5rem; background: var(--pico-code-background-color); border-radius: var(--pico-border-radius);">VMARGS=-Duser.name={{ .Data.UserState.Username }}</code>
         </li>
-        <li>Restart your Ghidra client.</li>
       </ol>
+
+      <strong>Option 2: Temporary Environment Variable</strong>
+      <p style="font-size: 0.9em; margin-bottom: 0.5rem;">Alternatively, you can pass the username via your terminal when launching Ghidra:</p>
+      <ul style="font-size: 0.9em; padding-left: 1.5rem; margin-bottom: 1rem;">
+        <li><strong>macOS/Linux:</strong> <code style="padding: 0.2rem 0.4rem; background: var(--pico-code-background-color); border-radius: var(--pico-border-radius);">USER={{ .Data.UserState.Username }} ./ghidraRun</code></li>
+        <li><strong>Windows (CMD):</strong> <code style="padding: 0.2rem 0.4rem; background: var(--pico-code-background-color); border-radius: var(--pico-border-radius);">set USERNAME={{ .Data.UserState.Username }} &amp;&amp; ghidraRun.bat</code></li>
+        <li><strong>Windows (PowerShell):</strong> <code style="padding: 0.2rem 0.4rem; background: var(--pico-code-background-color); border-radius: var(--pico-border-radius);">$env:USERNAME="{{ .Data.UserState.Username }}"; .\ghidraRun.bat</code></li>
+      </ul>
+
       <small><i class="fa fa-info-circle"></i> If you skip this step, Ghidra will attempt to log in using your computer's local account name, which will result in an "Access Denied" error.</small>
     </article>
 
