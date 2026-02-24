@@ -11,6 +11,16 @@ import (
 
 // Helper to extract client IP from request
 func getClientIP(req *http.Request) string {
+	// Check CF-Connecting-IP (Cloudflare)
+	if cfIP := req.Header.Get("CF-Connecting-IP"); cfIP != "" {
+		return cfIP
+	}
+
+	// Check True-Client-IP (Akamai, Cloudflare, etc)
+	if trueIP := req.Header.Get("True-Client-IP"); trueIP != "" {
+		return trueIP
+	}
+
 	// Check X-Forwarded-For header first (if behind proxy)
 	forwarded := req.Header.Get("X-Forwarded-For")
 	if forwarded != "" {

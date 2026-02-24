@@ -1,7 +1,9 @@
 package web
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -10,7 +12,7 @@ func formatUptime(d time.Duration) string {
 	days := int(d.Hours() / 24)
 	hours := int(d.Hours()) % 24
 	minutes := int(d.Minutes()) % 60
-	
+
 	if days > 0 {
 		return fmt.Sprintf("%dd %dh", days, hours)
 	}
@@ -40,11 +42,11 @@ func formatDate(millis int64) string {
 		return "N/A"
 	}
 	t := time.UnixMilli(millis)
-	
+
 	// If within last 24 hours, show relative time
 	now := time.Now()
 	diff := now.Sub(t)
-	
+
 	if diff < 24*time.Hour {
 		if diff < time.Hour {
 			mins := int(diff.Minutes())
@@ -56,18 +58,50 @@ func formatDate(millis int64) string {
 		hours := int(diff.Hours())
 		return fmt.Sprintf("%dh ago", hours)
 	}
-	
+
 	// If within last 7 days, show days ago
 	if diff < 7*24*time.Hour {
 		days := int(diff.Hours() / 24)
 		return fmt.Sprintf("%dd ago", days)
 	}
-	
+
 	// If within current year, show month and day
 	if t.Year() == now.Year() {
 		return t.Format("Jan 2")
 	}
-	
+
 	// Otherwise show full date
 	return t.Format("Jan 2, 2006")
+}
+
+// formatTime formats a time.Time into human-readable date using formatDate
+func formatTime(t time.Time) string {
+	if t.IsZero() {
+		return "N/A"
+	}
+	return formatDate(t.UnixMilli())
+}
+
+// formatDetails formats JSON audit log details into a human-readable string
+func formatDetails(detailsJSON string) string {
+	if detailsJSON == "" {
+		return ""
+	}
+	var details map[string]interface{}
+	if err := json.Unmarshal([]byte(detailsJSON), &details); err != nil {
+		return detailsJSON
+	}
+
+	if targetUser, ok := details["target_user"]; ok {
+		if role, ok := details["role"]; ok {
+			return fmt.Sprintf("for %v as %v", targetUser, role)
+		}
+		return fmt.Sprintf("for %v", targetUser)
+	}
+
+	var parts []string
+	for k, v := range details {
+		parts = append(parts, fmt.Sprintf("%s: %v", k, v))
+	}
+	return strings.Join(parts, ", ")
 }

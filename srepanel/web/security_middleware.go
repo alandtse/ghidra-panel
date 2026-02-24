@@ -8,7 +8,7 @@ func (s *Server) securityMiddleware(next http.Handler) http.Handler {
 		wr.Header().Set("X-Frame-Options", "DENY")
 		wr.Header().Set("X-Content-Type-Options", "nosniff")
 		wr.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
-		wr.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https://cdn.discordapp.com; font-src 'self' https://cdnjs.cloudflare.com")
+		wr.Header().Set("Content-Security-Policy", "default-src 'self'; connect-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; img-src 'self' data: https://cdn.discordapp.com; font-src 'self' https://cdnjs.cloudflare.com")
 
 		// Strict-Transport-Security if we are using HTTPS (implied by secure cookies)
 		if s.useSecureCookie {
