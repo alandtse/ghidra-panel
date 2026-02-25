@@ -66,6 +66,21 @@ go test -coverprofile=coverage.out ./...
 go tool cover -html=coverage.out -o coverage.html
 ```
 
+### Docker Tests (No Local Install Required)
+
+If you don't have Go 1.24 or Java installed on your host, you can run tests using Docker:
+
+```bash
+# Run all Go tests
+docker run --rm -v $(pwd):/app -w /app/srepanel golang:1.24 go test -v ./...
+
+# Run Go coverage
+docker run --rm -v $(pwd):/app -w /app/srepanel golang:1.24 sh -c "go test -coverprofile=coverage.out ./... && go tool cover -html=coverage.out -o coverage.html"
+
+# Run Java tests
+docker run --rm -v $(pwd):/app -w /app/jaas gradle:8.6-jdk21 gradle test
+```
+
 ### Java Tests
 
 ```bash

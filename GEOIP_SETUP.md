@@ -4,23 +4,22 @@ Display flag emoji + city/country for IP addresses in audit logs.
 
 ## Setup
 
-**1. Get GeoLite2 database** (free, requires signup):
+**1. Get MaxMind credentials** (free, requires signup):
    - Sign up: https://www.maxmind.com/en/geolite2/signup
-   - Download: GeoLite2-City.mmdb (binary format)
+   - Go to your account dashboard and generate a License Key
+   - Note down your Account ID and the License Key
 
-**2. Place database file:**
-Place the file in your project root or a persistent data directory.
-
-**3. Configure panel:**
-Update your `config.yaml` with the path to the database file. If using Docker, ensure the file is mounted into the container (e.g., at `/data/GeoLite2-City.mmdb`).
+**2. Configure panel:**
+Update your `config.yaml` with your credentials. The Docker stack will automatically download and update the database.
 
 ```yaml
 # config.yaml (example for Docker)
-geoip_database: "/data/GeoLite2-City.mmdb"
+maxmind_account_id: "your_account_id"
+maxmind_license_key: "your_license_key"
 ```
 
-**4. Restart panel**
-If using Docker: `docker compose restart panel`
+**3. Restart stack**
+If using Docker: `docker compose up -d`
 
 ## Verification
 
@@ -43,28 +42,11 @@ Check logs: `GeoIP database loaded: GeoLite2-City.mmdb`
 
 ## Updates
 
-MaxMind updates monthly. Download new `.mmdb` file and replace existing one.
+The included `geoipupdate` docker service automatically checks for constraints and downloads new updates weekly. You don't need to manually update anything!
 
-### Auto-update with Docker (Recommended)
+### Manual or Non-Docker setup
 
-The `docker-compose.yml` includes a sidecar service that automatically manages your database. To enable it:
-
-1. Add your MaxMind credentials to `config.yaml`:
-   ```yaml
-   # config.yaml
-   maxmind_account_id: "your_account_id"
-   maxmind_license_key: "your_license_key"
-   ```
-2. Restart your stack:
-   ```bash
-   docker compose up -d
-   ```
-
-That's it! The sidecar will download the database to the correct location (`/data/GeoLite2-City.mmdb`) and the panel will automatically find and use it.
-
-### Manual update
-
-Download the new `.mmdb` file and replace the existing one in your data directory.
+If you are not using Docker, you can manually download the GeoLite2-City.mmdb file and place it in the same directory as the executable, or explicitly set the `--geoip_database` CLI flag or YAML configuration.
 
 ## Troubleshooting
 

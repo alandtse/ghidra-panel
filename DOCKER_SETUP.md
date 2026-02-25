@@ -1,4 +1,4 @@
-# Docker Deployment Guide
+# Administrator Operations Guide
 
 This repository includes a full containerized setup for deploying both the SREPanel and a customized Ghidra Server instances anywhere using Docker Compose.
 
@@ -50,6 +50,43 @@ services:
     environment:
       - GHIDRA_PUBLIC_HOSTNAME=your-server-ip.com
 ```
+
+## Server Maintenance
+
+### Complete Volume Migration (Moving Servers)
+The SQLite database and the Ghidra repositories are stored in named volumes (`panel_data` and `ghidra_repos`). To migrate to a new server, you can create a tarball of both volumes:
+
+1. Stop the containers:
+   ```bash
+   docker compose down
+   ```
+2. Backup the volumes using a temporary Alpine container:
+   ```bash
+   # Backup the Panel Database & Configs
+   docker run --rm -v ghidra-panel_panel_data:/data -v $(pwd):/backup alpine tar -czvf /backup/panel_data_backup.tar.gz -C /data .
+
+   # Backup the Ghidra Repos
+   docker run --rm -v ghidra-panel_ghidra_repos:/repos -v $(pwd):/backup alpine tar -czvf /backup/ghidra_repos_backup.tar.gz -C /repos .
+   ```
+3. Transfer the `.tar.gz` files to the new server. Create the empty volumes and extract the data:
+   ```bash
+   docker volume create ghidra-panel_panel_data
+   docker volume create ghidra-panel_ghidra_repos
+
+   docker run --rm -v ghidra-panel_panel_data:/data -v $(pwd):/backup alpine sh -c "cd /data && tar -xzvf /backup/panel_data_backup.tar.gz"
+   docker run --rm -v ghidra-panel_ghidra_repos:/repos -v $(pwd):/backup alpine sh -c "cd /repos && tar -xzvf /backup/ghidra_repos_backup.tar.gz"
+   ```
+
+### Proxmox / Unraid / Advanced Hypervisors
+If you are running the Docker host inside a hypervisor that supports full VM/LXC snapshots (like Proxmox or Unraid), it is often better to use **Bind Mounts**. This stores your data in a transparent directory on the host rather than hidden in Docker's internal volumetric storage.
+
+To do this, modify the `volumes:` section of both services in `docker-compose.yml` to point to a local directory:
+```yaml
+    volumes:
+      - ./data/panel:/data    # SQLite DB and config
+      - ./data/repos:/repos   # Ghidra repos
+```
+*Note: Make sure these directories are owned by the correct user if you hit permission issues.*
 
 ## Customizing Ghidra Versions
 

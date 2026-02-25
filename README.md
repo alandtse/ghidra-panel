@@ -42,7 +42,7 @@ Create OAuth app with redirect URI: `{base_url}/redirect`
 
 **Optional:**
 - `first_user_is_admin: true` - First login becomes super admin
-- `geoip_database: "GeoLite2-City.mmdb"` - IP geolocation ([setup](./GEOIP_SETUP.md))
+- `maxmind_account_id` / `license_key` - IP geolocation ([setup](./GEOIP_SETUP.md))
 - `audit_log_retention_days: 365` - Log retention period
 - `community_name: "Your Team"` - Custom branding
 
@@ -109,9 +109,14 @@ Built for hobbyist communities with limited maintenance time:
 
 ## Documentation
 
-- [GHIDRA_SERVER_SETUP.md](./GHIDRA_SERVER_SETUP.md) - Server installation
-- [GEOIP_SETUP.md](./GEOIP_SETUP.md) - IP geolocation setup
+### For Administrators (Deployment & Support)
+- [Administrator Operations Guide (Docker Setup & Maintenance)](./DOCKER_SETUP.md)
+- [GHIDRA_SERVER_SETUP.md](./GHIDRA_SERVER_SETUP.md) - Manual Ghidra Server installation
+- [GEOIP_SETUP.md](./GEOIP_SETUP.md) - IP geolocation configuration
 - [config.example.yaml](./config.example.yaml) - Full configuration reference
+
+### For Developers (Contributors)
+- [Testing Guide](./TESTING.md) - How to run test suites (local or via Docker)
 
 ## Acknowledgements
 
