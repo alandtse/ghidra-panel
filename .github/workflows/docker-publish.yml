@@ -1,0 +1,59 @@
+name: Deploy to GHCR
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  GHIDRA_IMAGE: ${{ github.repository }}-server
+  PANEL_IMAGE: ${{ github.repository }}-panel
+
+jobs:
+  build-and-push-images:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Panel
+        id: meta-panel
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.PANEL_IMAGE }}
+
+      - name: Build and push Panel image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.srepanel
+          push: true
+          tags: ${{ steps.meta-panel.outputs.tags }}
+          labels: ${{ steps.meta-panel.outputs.labels }}
+
+      - name: Extract metadata (tags, labels) for Ghidra
+        id: meta-ghidra
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.GHIDRA_IMAGE }}
+          
+      - name: Build and push Ghidra image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.ghidra
+          push: true
+          tags: ${{ steps.meta-ghidra.outputs.tags }}
+          labels: ${{ steps.meta-ghidra.outputs.labels }}
