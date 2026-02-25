@@ -1,4 +1,14 @@
-# Ghidra Panel Configuration Example
+# Ghidra Panel Configuration
+#
+# All values below can be overridden using environment variables 
+# prefixed with \`SRE_\` and mapped directly to the yaml keys. 
+# Examples: 
+#   - SRE_BASE_URL="http://example.com"
+#   - SRE_COMMUNITY_NAME="My Community"
+#   - SRE_MAXMIND_ACCOUNT_ID="123456"
+# For OAuth providers, use the map key:
+#   - SRE_OAUTH_GITHUB_CLIENT_ID="abc..."
+#   - SRE_OAUTH_GOOGLE_ENABLED="true" Example
 # Copy this file to config.yaml and customize it with your OAuth credentials
 
 # Config version - helps track format changes (current: 1)

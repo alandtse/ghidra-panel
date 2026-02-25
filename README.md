@@ -8,6 +8,15 @@ Self-service web panel for collaborative Ghidra reverse engineering projects.
 
 ## Quick Start
 
+**Method 1: Docker (Recommended)**
+The easiest way to stand up both the Web Panel and the Ghidra Server is to use the included Docker Compose stack.
+```bash
+cp config.example.yaml config.yaml # Configure OAuth credentials
+docker compose up -d --build       # Downloads Ghidra, compiles, and starts
+```
+See [Administrator Operations Guide](./DOCKER_SETUP.md) for more details.
+
+**Method 2: Manual / Dev Build**
 ```bash
 make build jaas                    # Build panel + JAAS plugin
 cp config.example.yaml config.yaml # Configure OAuth credentials
@@ -18,6 +27,9 @@ cd jaas && make install            # Install to Ghidra Server
 Visit `http://localhost:8080`
 
 ## Configuration
+
+**Environment Variables Support**:
+All attributes in the `config.yaml` file can be overridden at runtime using environment variables prefixed with `SRE_`. For example, `base_url` becomes `SRE_BASE_URL` and `community_name` becomes `SRE_COMMUNITY_NAME`.
 
 **Minimal setup** - Add OAuth credentials to `config.yaml`:
 

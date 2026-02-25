@@ -27,6 +27,23 @@ This repository includes a full containerized setup for deploying both the SREPa
 
    *Note: The first time you run this, it will download the Ghidra release zip, compile the `jaas` Gradle plugin, build the Go backend, and patch the server configurations. This may take a few minutes.*
 
+## Advanced Configuration (Environment Variables)
+
+Alternatively, you can skip configuring a static `config.yaml` file by passing environment variables directly in your `docker-compose.yml` or through a `.env` file. 
+
+Prefix any configuration key with `SRE_`. For example:
+
+```yaml
+  panel:
+    environment:
+      - SRE_BASE_URL=https://panel.example.com
+      - SRE_COMMUNITY_NAME=My Community
+      - SRE_GEOIP_DATABASE=/data/GeoLite2-City.mmdb
+      # Nested OAuth Map overrides
+      - SRE_OAUTH_GITHUB_CLIENT_ID=abc...
+```
+*Note: Make sure to still define the `panel_data` mount so the SQLite database persists!*
+
 ## Volume Management
 
 The `docker-compose.yml` mounts two persistent volumes:

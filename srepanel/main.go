@@ -13,7 +13,6 @@ import (
 	"go.mkw.re/ghidra-panel/common"
 	"go.mkw.re/ghidra-panel/ghidra"
 	"golang.org/x/sync/errgroup"
-	"gopkg.in/yaml.v3"
 
 	"go.mkw.re/ghidra-panel/database"
 	"go.mkw.re/ghidra-panel/discord"
@@ -323,24 +322,6 @@ func main() {
 		log.Println(err)
 	}
 	log.Println("Server stopped gracefully")
-}
-
-// loadConfig loads configuration from either JSON or YAML file
-// Since JSON is a subset of YAML, we use the YAML parser for both formats
-func loadConfig(path string) (config, error) {
-	var cfg config
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return cfg, err
-	}
-
-	// YAML parser handles both YAML and JSON
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return cfg, err
-	}
-
-	return cfg, nil
 }
 
 func updateAccount(dbPath string, userID uint64, user, pass string) {

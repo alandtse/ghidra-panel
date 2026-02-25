@@ -4,84 +4,85 @@ import (
 	"log"
 	"strings"
 
+	"github.com/ilyakaznacheev/cleanenv"
 	"go.mkw.re/ghidra-panel/common"
 )
 
 // OAuthProviderConfig represents configuration for an OAuth provider
 type OAuthProviderConfig struct {
-	Enabled      bool   `yaml:"enabled"`
-	ClientID     string `yaml:"client_id"`
-	ClientSecret string `yaml:"client_secret"`
+	Enabled      bool   `yaml:"enabled" env:"ENABLED"`
+	ClientID     string `yaml:"client_id" env:"CLIENT_ID"`
+	ClientSecret string `yaml:"client_secret" env:"CLIENT_SECRET"`
 	// Type specifies the provider type: "oauth2" or "oidc"
 	// Default is "oidc" if issuer_url is set, "oauth2" otherwise
-	Type string `yaml:"type,omitempty"`
+	Type string `yaml:"type,omitempty" env:"TYPE"`
 
 	// OIDC-specific configuration
 	// IssuerURL is used for OIDC providers (e.g., Google, GitLab)
-	IssuerURL string `yaml:"issuer_url,omitempty"`
+	IssuerURL string `yaml:"issuer_url,omitempty" env:"ISSUER_URL"`
 
 	// OAuth2-specific configuration
 	// AuthURL is the authorization endpoint (e.g., "https://github.com/login/oauth/authorize")
-	AuthURL string `yaml:"auth_url,omitempty"`
+	AuthURL string `yaml:"auth_url,omitempty" env:"AUTH_URL"`
 	// TokenURL is the token endpoint (e.g., "https://github.com/login/oauth/access_token")
-	TokenURL string `yaml:"token_url,omitempty"`
+	TokenURL string `yaml:"token_url,omitempty" env:"TOKEN_URL"`
 	// UserInfoURL is the user info endpoint (e.g., "https://api.github.com/user")
-	UserInfoURL string `yaml:"user_info_url,omitempty"`
+	UserInfoURL string `yaml:"user_info_url,omitempty" env:"USER_INFO_URL"`
 	// Scopes are the OAuth scopes to request (e.g., ["read:user"])
-	Scopes []string `yaml:"scopes,omitempty"`
+	Scopes []string `yaml:"scopes,omitempty" env:"SCOPES"`
 	// AuthStyle is "params" or "header" (default: "header")
-	AuthStyle string `yaml:"auth_style,omitempty"`
+	AuthStyle string `yaml:"auth_style,omitempty" env:"AUTH_STYLE"`
 
 	// Field mapping for user info extraction
 	// UserIDField is the JSON field for user ID (default: "id")
-	UserIDField string `yaml:"user_id_field,omitempty"`
+	UserIDField string `yaml:"user_id_field,omitempty" env:"USER_ID_FIELD"`
 	// UsernameField is the JSON field for username (default: "username")
-	UsernameField string `yaml:"username_field,omitempty"`
+	UsernameField string `yaml:"username_field,omitempty" env:"USERNAME_FIELD"`
 	// AvatarField is the JSON field for avatar URL (optional)
-	AvatarField string `yaml:"avatar_field,omitempty"`
+	AvatarField string `yaml:"avatar_field,omitempty" env:"AVATAR_FIELD"`
 	// UserIDIsString indicates if user ID is a string that needs parsing (e.g., Discord)
-	UserIDIsString bool `yaml:"user_id_is_string,omitempty"`
+	UserIDIsString bool `yaml:"user_id_is_string,omitempty" env:"USER_ID_IS_STRING"`
 
 	// Display configuration
 	// DisplayName is the human-readable name shown on the login button
 	// If not set, the provider key will be capitalized (e.g., "okta" → "Okta")
-	DisplayName string `yaml:"display_name,omitempty"`
+	DisplayName string `yaml:"display_name,omitempty" env:"DISPLAY_NAME"`
 	// IconURL is a URL to an icon/logo for the provider
 	// If not set, built-in icons will be used for known providers (discord, github, google, gitlab)
-	IconURL string `yaml:"icon_url,omitempty"`
+	IconURL string `yaml:"icon_url,omitempty" env:"ICON_URL"`
 }
 
 type config struct {
-	ConfigVersion int    `yaml:"config_version,omitempty"` // Optional: helps track config format changes
-	CommunityName string `yaml:"community_name,omitempty"` // Optional: display name for your community/server
-	BaseURL       string `yaml:"base_url"`
+	ConfigVersion int    `yaml:"config_version,omitempty" env:"SRE_CONFIG_VERSION"` // Optional: helps track config format changes
+	CommunityName string `yaml:"community_name,omitempty" env:"SRE_COMMUNITY_NAME"` // Optional: display name for your community/server
+	BaseURL       string `yaml:"base_url" env:"SRE_BASE_URL"`
 	// Legacy Discord config (deprecated, but kept for backwards compatibility)
 	Discord struct {
-		BotToken     string `yaml:"bot_token"`
-		ClientID     string `yaml:"client_id"`
-		ClientSecret string `yaml:"client_secret"`
-		WebhookURL   string `yaml:"webhook_url"`
+		BotToken     string `yaml:"bot_token" env:"SRE_DISCORD_BOT_TOKEN"`
+		ClientID     string `yaml:"client_id" env:"SRE_DISCORD_CLIENT_ID"`
+		ClientSecret string `yaml:"client_secret" env:"SRE_DISCORD_CLIENT_SECRET"`
+		WebhookURL   string `yaml:"webhook_url" env:"SRE_DISCORD_WEBHOOK_URL"`
 	} `yaml:"discord"`
 	// OAuth providers config - supports both fixed providers and dynamic OIDC providers
 	// You can add any OIDC-compliant provider by adding a new key
-	OAuth  map[string]OAuthProviderConfig `yaml:"oauth"`
+	OAuth  map[string]OAuthProviderConfig `yaml:"oauth" env-prefix:"SRE_OAUTH_"`
 	Ghidra struct {
 		Endpoint common.GhidraEndpoint `yaml:"endpoint"`
-		GRPCAddr string                `yaml:"grpc_addr"`
+		GRPCAddr string                `yaml:"grpc_addr" env:"SRE_GHIDRA_GRPC_ADDR"`
 	} `yaml:"ghidra"`
 	Links             []common.Link `yaml:"links"`
-	SuperAdmins       []string      `yaml:"super_admins"`
-	FirstUserIsAdmin  bool          `yaml:"first_user_is_admin"`
-	GeoIPDatabase     string        `yaml:"geoip_database"`
-	MaxMindAccountID  string        `yaml:"maxmind_account_id"`
-	MaxMindLicenseKey string        `yaml:"maxmind_license_key"`
+	SuperAdmins       []string      `yaml:"super_admins" env:"SRE_SUPER_ADMINS"`
+	FirstUserIsAdmin  bool          `yaml:"first_user_is_admin" env:"SRE_FIRST_USER_IS_ADMIN"`
+	GeoIPDatabase     string        `yaml:"geoip_database" env:"SRE_GEOIP_DATABASE"`
+	MaxMindAccountID  string        `yaml:"maxmind_account_id" env:"SRE_MAXMIND_ACCOUNT_ID"`
+	MaxMindLicenseKey string        `yaml:"maxmind_license_key" env:"SRE_MAXMIND_LICENSE_KEY"`
 
 	// Optional: Number of days to retain audit logs (default: 90)
 	// Old logs are automatically cleaned up daily
-	AuditLogRetentionDays int `yaml:"audit_log_retention_days"`
+	AuditLogRetentionDays int `yaml:"audit_log_retention_days" env:"SRE_AUDIT_LOG_RETENTION_DAYS"`
 
 	// Optional: Number of days token is valid (default: 90)
-	TokenValidityDays int `yaml:"token_validity_days,omitempty"`
+	TokenValidityDays int `yaml:"token_validity_days,omitempty" env:"SRE_TOKEN_VALIDITY_DAYS"`
 }
 
 func (c *config) validate() {
@@ -183,4 +184,25 @@ func isPlaceholder(value string) bool {
 	}
 
 	return false
+}
+
+// loadConfig loads configuration from either JSON or YAML file
+// It also reads from the environment variables utilizing cleanenv.
+func loadConfig(path string) (config, error) {
+	var cfg config
+
+	err := cleanenv.ReadConfig(path, &cfg)
+	if err != nil {
+		// If the file doesn't exist, we still want to read env vars
+		if strings.Contains(err.Error(), "no such file or directory") {
+			err = cleanenv.ReadEnv(&cfg)
+			if err != nil {
+				return cfg, err
+			}
+			return cfg, nil
+		}
+		return cfg, err
+	}
+
+	return cfg, nil
 }
