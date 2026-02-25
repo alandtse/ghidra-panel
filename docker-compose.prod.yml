@@ -1,7 +1,6 @@
 services:
   ghidra:
-    # Requires substituting with the actual github repository username/org
-    image: ghcr.io/YOUR_GITHUB_ORG/ghidra-panel-server:latest
+    image: ghcr.io/alandtse/ghidra-server:latest
     ports:
       - "13100:13100"
       - "13101:13101"
@@ -16,8 +15,7 @@ services:
       - panel
 
   panel:
-    # Requires substituting with the actual github repository username/org
-    image: ghcr.io/YOUR_GITHUB_ORG/ghidra-panel:latest
+    image: ghcr.io/alandtse/ghidra-panel:latest
     ports:
       - "8080:8080"
     volumes:

@@ -9,10 +9,17 @@ Self-service web panel for collaborative Ghidra reverse engineering projects.
 ## Quick Start
 
 **Method 1: Docker (Recommended)**
-The easiest way to stand up both the Web Panel and the Ghidra Server is to use the included Docker Compose stack.
+The easiest way to stand up both the Web Panel and the Ghidra Server is to use the included Docker Compose stack. Releases are automatically published to the GitHub Container Registry. 
+
 ```bash
-cp config.example.yaml config.yaml # Configure OAuth credentials
-docker compose up -d --build       # Downloads Ghidra, compiles, and starts
+# 1. Download the template config
+curl -O https://raw.githubusercontent.com/alandtse/ghidra-panel/main/config.example.yaml
+mv config.example.yaml config.yaml
+
+# 2. Edit config.yaml with your OAuth credentials!
+
+# 3. Start the server using the compiled stack
+docker compose -f https://raw.githubusercontent.com/alandtse/ghidra-panel/main/docker-compose.prod.yml up -d
 ```
 See [Administrator Operations Guide](./DOCKER_SETUP.md) for more details.
 
