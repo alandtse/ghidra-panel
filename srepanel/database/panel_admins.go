@@ -49,16 +49,25 @@ func (d *DB) CountPanelAdmins(ctx context.Context) (int, error) {
 }
 
 // ListPanelAdmins returns all panel admin user IDs and providers
-func (d *DB) ListPanelAdmins(ctx context.Context) ([]struct{ ID uint64; Provider string }, error) {
+func (d *DB) ListPanelAdmins(ctx context.Context) ([]struct {
+	ID       uint64
+	Provider string
+}, error) {
 	rows, err := d.QueryContext(ctx, `SELECT id, provider FROM panel_admins ORDER BY granted_at`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var admins []struct{ ID uint64; Provider string }
+	var admins []struct {
+		ID       uint64
+		Provider string
+	}
 	for rows.Next() {
-		var admin struct{ ID uint64; Provider string }
+		var admin struct {
+			ID       uint64
+			Provider string
+		}
 		if err := rows.Scan(&admin.ID, &admin.Provider); err != nil {
 			return nil, err
 		}

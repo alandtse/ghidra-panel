@@ -29,10 +29,10 @@ type OAuth2Config struct {
 
 // GenericOAuth2Provider implements a configurable OAuth2 provider
 type GenericOAuth2Provider struct {
-	name      string
-	config    oauth2.Config
-	userInfo  OAuth2Config
-	prot      *csrf.OneTime
+	name     string
+	config   oauth2.Config
+	userInfo OAuth2Config
+	prot     *csrf.OneTime
 }
 
 // NewGenericOAuth2Provider creates a new generic OAuth2 provider
@@ -210,7 +210,7 @@ func getNestedFloat(data map[string]interface{}, field string) (float64, bool) {
 func getNestedValue(data map[string]interface{}, field string) interface{} {
 	// Split field by dots
 	parts := splitField(field)
-	
+
 	// Traverse nested maps
 	current := interface{}(data)
 	for _, part := range parts {
@@ -224,14 +224,14 @@ func getNestedValue(data map[string]interface{}, field string) interface{} {
 			return nil
 		}
 	}
-	
+
 	return current
 }
 
 func splitField(field string) []string {
 	var parts []string
 	current := ""
-	
+
 	for i := 0; i < len(field); i++ {
 		if field[i] == '.' {
 			if current != "" {
@@ -242,10 +242,10 @@ func splitField(field string) []string {
 			current += string(field[i])
 		}
 	}
-	
+
 	if current != "" {
 		parts = append(parts, current)
 	}
-	
+
 	return parts
 }

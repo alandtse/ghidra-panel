@@ -71,7 +71,7 @@ func GetActionDescription(action string) string {
 // CleanupOldAuditLogs deletes audit logs older than the specified number of days
 func (d *DB) CleanupOldAuditLogs(ctx context.Context, olderThanDays int) (int64, error) {
 	cutoffTime := time.Now().AddDate(0, 0, -olderThanDays).UnixMilli()
-	
+
 	result, err := d.ExecContext(ctx,
 		`DELETE FROM audit_logs WHERE timestamp < ?`,
 		cutoffTime,
@@ -79,7 +79,7 @@ func (d *DB) CleanupOldAuditLogs(ctx context.Context, olderThanDays int) (int64,
 	if err != nil {
 		return 0, err
 	}
-	
+
 	return result.RowsAffected()
 }
 

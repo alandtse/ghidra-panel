@@ -206,7 +206,7 @@ func TestOneTime_DoubleConsume(t *testing.T) {
 	if err == nil {
 		t.Error("expected error on double consumption, got nil")
 	}
-	
+
 	// Verify error message indicates reuse
 	if err != nil && err.Error() != "csrf reuse detected" {
 		t.Errorf("expected 'csrf reuse detected' error, got: %v", err)

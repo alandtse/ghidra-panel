@@ -19,7 +19,7 @@ func Generate() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	
+
 	// Join with hyphens for easy typing
 	return strings.Join(words, "-"), nil
 }
