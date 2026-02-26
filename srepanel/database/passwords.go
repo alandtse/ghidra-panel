@@ -114,7 +114,11 @@ func (d *DB) UpdatePassword(ctx context.Context, id uint64, password string, pro
 		return err
 	}
 
-	if rows, _ := result.RowsAffected(); rows == 0 {
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
 		return fmt.Errorf("user not found")
 	}
 	return nil
@@ -145,7 +149,11 @@ func (d *DB) UpdateAccount(ctx context.Context, id uint64, username string, pass
 		return err
 	}
 
-	if rows, _ := result.RowsAffected(); rows == 0 {
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
 		return fmt.Errorf("user not found")
 	}
 	return nil

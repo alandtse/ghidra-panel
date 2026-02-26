@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"log"
+	"os"
 	"strings"
 
 	"github.com/ilyakaznacheev/cleanenv"
@@ -194,7 +196,7 @@ func loadConfig(path string) (config, error) {
 	err := cleanenv.ReadConfig(path, &cfg)
 	if err != nil {
 		// If the file doesn't exist, we still want to read env vars
-		if strings.Contains(err.Error(), "no such file or directory") {
+		if errors.Is(err, os.ErrNotExist) {
 			err = cleanenv.ReadEnv(&cfg)
 			if err != nil {
 				return cfg, err

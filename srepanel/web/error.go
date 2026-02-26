@@ -33,6 +33,6 @@ func (s *Server) renderError(wr http.ResponseWriter, req *http.Request, status i
 
 	if err := errorPage.Execute(wr, tmplData); err != nil {
 		log.Print("Failed to render error page:", err)
-		_, _ = wr.Write([]byte("Failed to render the error page"))
+		http.Error(wr, "Failed to render the error page", http.StatusInternalServerError)
 	}
 }

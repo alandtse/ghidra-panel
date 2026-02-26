@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"go.mkw.re/ghidra-panel/common"
-	"go.mkw.re/ghidra-panel/discord"
-	"go.mkw.re/ghidra-panel/ghidra"
 	"log"
 	"net/http"
 	"net/url"
+
+	"go.mkw.re/ghidra-panel/common"
+	"go.mkw.re/ghidra-panel/discord"
+	"go.mkw.re/ghidra-panel/ghidra"
 )
 
 func (s *Server) handleRequestAccess(wr http.ResponseWriter, req *http.Request) {
@@ -75,7 +76,12 @@ func (s *Server) handleRequestAccess(wr http.ResponseWriter, req *http.Request) 
 		// Fallback to the global webhook URL
 		webhookUrl = s.Config.DiscordWebhookURL
 	}
-	payloadBuf, _ := json.Marshal(message)
+	payloadBuf, err := json.Marshal(message)
+	if err != nil {
+		log.Println("Failed to serialize webhook message:", err)
+		http.Redirect(wr, req, redirectUrl(req, map[string]string{"status": "internal_error"}), http.StatusSeeOther)
+		return
+	}
 	req, err = http.NewRequestWithContext(req.Context(), http.MethodPost, webhookUrl, bytes.NewReader(payloadBuf))
 	if err != nil {
 		log.Println("Failed to create webhook request:", err)

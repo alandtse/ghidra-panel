@@ -146,6 +146,9 @@ func hashSubjectToID(subject string) uint64 {
 	hash := sha256.Sum256([]byte(subject))
 	// Take first 16 hex characters (64 bits) of the hash
 	hexStr := hex.EncodeToString(hash[:])[:16]
-	id, _ := strconv.ParseUint(hexStr, 16, 64)
+	id, err := strconv.ParseUint(hexStr, 16, 64)
+	if err != nil {
+		panic("invalid hex slice from sha256: " + err.Error())
+	}
 	return id
 }

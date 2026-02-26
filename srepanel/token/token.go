@@ -66,7 +66,10 @@ func (iss Issuer) Verify(tokenString string) (ident *common.Identity, err error)
 	}
 
 	// Parse claims
-	claims := token.Claims.(*Claims)
+	claims, ok := token.Claims.(*Claims)
+	if !ok {
+		return nil, fmt.Errorf("invalid token claims")
+	}
 	id, err := strconv.ParseUint(claims.Subject, 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse subject: %v", err)
