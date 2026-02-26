@@ -29,7 +29,7 @@ This repository includes a full containerized setup for deploying both the SREPa
 
 ## Advanced Configuration (Environment Variables)
 
-Alternatively, you can skip configuring a static `config.yaml` file by passing environment variables directly in your `docker-compose.yml` or through a `.env` file. 
+Alternatively, you can skip configuring a static `config.yaml` file by passing environment variables directly in your `docker-compose.yml` or through a `.env` file.
 
 Prefix any configuration key with `SRE_`. For example:
 
@@ -107,7 +107,7 @@ To do this, modify the `volumes:` section of both services in `docker-compose.ym
 
 ## Customizing Ghidra Versions
 
-By default, the `docker-compose.yml` configures the build to download **Ghidra 12.0.3 PUBLIC**. 
+By default, the `docker-compose.yml` configures the build to download **Ghidra 12.0.3 PUBLIC**.
 If you want to deploy a different version, you edit the `GHIDRA_ZIP_URL` argument directly in `docker-compose.yml`:
 
 ```yaml
@@ -129,3 +129,180 @@ git pull
 docker compose up -d --build
 ```
 This forces a clean recompilation of the plugin and Go binary.
+
+
+---
+
+# Ghidra Server Setup
+
+Install the JAAS plugin on your Ghidra Server to enable panel authentication.
+
+## Prerequisites
+
+- Ghidra Server installed
+- Java JDK (same version as Ghidra) - check with `java -version`
+- Panel SQLite database accessible
+
+## Installation
+
+### Quick Install
+
+```bash
+cd jaas
+make build install  # Requires GHIDRA_SERVER_DIR env var
+```
+
+### Manual Install
+
+**1. Build JAR:**
+```bash
+cd jaas
+./gradlew build  # Output: build/libs/ghidra-panel-jaas.jar
+```
+
+**2. Create `ghidra/server/jaas.conf`:**
+```java
+auth {
+    re.mkw.srejaas.PanelLoginModule REQUIRED
+        JDBC="jdbc:sqlite:/path/to/panel.db"
+    ;
+};
+```
+
+**3. Edit `ghidra/server/server.conf`:**
+```properties
+# Main class
+wrapper.java.app.mainclass=re.mkw.srejaas.PanelServer
+
+# Classpath
+wrapper.java.classpath.Panel=/path/to/ghidra-panel-jaas.jar
+
+# JAAS config
+wrapper.app.parameter.1=-a4
+wrapper.app.parameter.2=/path/to/jaas.conf
+
+# gRPC port (default: 13103)
+wrapper.app.parameter.gRPC=-g13103
+
+# Java 25 compatibility (if needed)
+wrapper.java.additional.10=--add-opens=java.base/java.lang.invoke=ALL-UNNAMED
+```
+
+**4. Start Ghidra Server:**
+```bash
+./svrAdmin
+```
+
+Panel should show "● Ghidra Server Online"
+
+## Java 25 Compatibility
+
+If using Java 25, add to `server.conf`:
+```properties
+wrapper.java.additional.10=--add-opens=java.base/java.lang.invoke=ALL-UNNAMED
+```
+
+## Troubleshooting
+
+**Panel shows "Offline":**
+- Check Ghidra Server logs: `ghidra/server/logs/wrapper.log`
+- Verify gRPC port not in use: `netstat -an | grep 13103`
+- Test database path in `jaas.conf`
+
+**"ClassNotFoundException":**
+- Verify JAR path in `server.conf` `wrapper.java.classpath.Panel`
+- Ensure absolute path, not relative
+
+**"SQLException: database locked":**
+- Stop all Ghidra Servers accessing same database
+- Check file permissions
+
+**Port conflict:**
+- Change gRPC port: `wrapper.app.parameter.gRPC=-g13104`
+- Update panel config: `ghidra.grpc_addr: "localhost:13104"`
+
+## Development
+
+**Hot reload plugin:**
+```bash
+cd jaas && make build
+# Restart Ghidra Server to load new JAR
+```
+
+**Enable debug logging:**
+```properties
+# server.conf
+wrapper.console.loglevel=DEBUG
+```
+
+
+---
+
+# IP Geolocation Setup (Optional)
+
+Display flag emoji + city/country for IP addresses in audit logs.
+
+## Setup
+
+**1. Get MaxMind credentials** (free, requires signup):
+   - Sign up: https://www.maxmind.com/en/geolite2/signup
+   - Go to your account dashboard and generate a License Key
+   - Note down your Account ID and the License Key
+
+**2. Configure panel:**
+Update your `config.yaml` with your credentials. The Docker stack will automatically download and update the database.
+
+```yaml
+# config.yaml (example for Docker)
+maxmind_account_id: "your_account_id"
+maxmind_license_key: "your_license_key"
+```
+
+**3. Restart stack**
+If using Docker: `docker compose up -d`
+
+## Verification
+
+**With GeoIP:**
+```
+IP Address    Location
+[::1]         🏠 localhost
+203.0.113.45  🇺🇸 San Francisco, United States
+198.51.100.78 🇬🇧 London, United Kingdom
+```
+
+**Without GeoIP:**
+```
+IP Address    Location
+[::1]         -
+203.0.113.45  -
+```
+
+Check logs: `GeoIP database loaded: GeoLite2-City.mmdb`
+
+## Updates
+
+The included `geoipupdate` docker service automatically checks for constraints and downloads new updates weekly. You don't need to manually update anything!
+
+### Manual or Non-Docker setup
+
+If you are not using Docker, you can manually download the GeoLite2-City.mmdb file and place it in the same directory as the executable, or explicitly set the `--geoip_database` CLI flag or YAML configuration.
+
+## Troubleshooting
+
+**Locations show "-":**
+- Verify file path in config
+- Check file permissions
+- Look for "GeoIP database loaded" in logs
+
+**Wrong location:**
+- GeoLite2 accuracy: ~95% country, ~80% city
+- VPNs show VPN server location (expected)
+- Private IPs (192.168.x.x) have no location data
+
+## Details
+
+- **File size:** ~60 MB
+- **Lookup time:** ~1ms per IP
+- **Privacy:** Lookups are local, no external API calls
+- **Storage:** Location not stored in DB, computed on-demand
