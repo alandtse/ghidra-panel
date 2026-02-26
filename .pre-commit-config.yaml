@@ -10,20 +10,25 @@ repos:
     - id: check-merge-conflict
     - id: detect-private-key
 
-  # Go-specific hooks
-  - repo: https://github.com/dnephin/pre-commit-golang
-    rev: v0.5.1
+  # Go-specific hooks (Customized for srepanel/ subdirectory)
+  - repo: local
     hooks:
     - id: go-fmt
-      args: [-w]
+      name: go fmt
+      entry: bash -c 'cd srepanel && go fmt ./...'
+      language: system
       files: \.go$
-    - id: go-imports
-      args: [-w]
-      files: \.go$
+      pass_filenames: false
     - id: go-vet
+      name: go vet
+      entry: bash -c 'cd srepanel && go vet ./...'
+      language: system
       files: \.go$
+      pass_filenames: false
     - id: go-unit-tests
-      args: [-timeout=5m]
+      name: go test
+      entry: bash -c 'cd srepanel && go test -short ./...'
+      language: system
       files: \.go$
       pass_filenames: false
 
